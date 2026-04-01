@@ -11,7 +11,7 @@ import File from './File.js';
 import PathFixer from './PathFixer.js';
 import Validator from './Validator.js';
 
-const dependencyFile = 'dep.NetFeez-Labs.json';
+const dependencyFile = 'depFlow.json';
 
 /**
  * Extracts a repository name from its URL.

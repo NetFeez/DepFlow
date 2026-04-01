@@ -30,7 +30,7 @@ You can interact with the dependency flow in two ways:
 
 | Command | Usage | Description |
 |---|---|---|
-| `list` | `dep list` | Lists all dependencies configured in `dep.NetFeez-Labs.json`. |
+| `list` | `dep list` | Lists all dependencies configured in `depFlow.json`. |
 | `add` | `dep add <repo_url> [name]` | Adds a new dependency to your configuration. |
 | `remove`| `dep remove <name_or_repo_url>` | Removes a dependency using its name or repository URL. |
 | `install`| `dep install [name...]`| Clones and sets up all dependencies, or specific ones. |
@@ -40,11 +40,11 @@ You can interact with the dependency flow in two ways:
 
 # ⚙️ Configuration File (`depFlow.json`)
 
-All dependencies are defined in a `dep.NetFeez-Labs.json` file located in your project's root directory. This file contains a JSON array of dependency objects.
+All dependencies are defined in a `depFlow.json` file located in your project's root directory. This file contains a JSON array of dependency objects.
 
 ## Schema and Examples
 
-Here’s a look at the structure of a `dep.NetFeez-Labs.json` file:
+Here’s a look at the structure of a `depFlow.json` file:
 
 ```json
 [
