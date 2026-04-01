@@ -34,11 +34,9 @@ export class PathFixer {
             const root = this.info.root.replace(/^\.\//g, '');
 
             let target = value[0].replace(/(?:^\.\/)|(?:\/\*$)/g, '');
-            console.log(target, this.info.root, this.absoluteRoot, this.projectRoot);
             target = target.replace(new RegExp(`^${this.info.root}`), '');
             target = target.replace(/^\/|\/$/g, '');
             target = path.resolve(this.absoluteRoot, target);
-            console.log(alias, target);
             result.push({ alias, target });
         }
         this._alias = result;
