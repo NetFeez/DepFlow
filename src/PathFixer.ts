@@ -28,13 +28,17 @@ export class PathFixer {
         const result: PathFixer.Alias[] = [];
         for (const [key, value] of Object.entries(this.info.path)) {
             let alias = key.replace(/\/\*$/, '');
-            alias = alias.replace(new RegExp(`^${this.info.root}`), '');
+            // alias = alias.replace(new RegExp(`^${this.info.root}`), '');
             alias = alias.replace(/^\//, '');
 
-            let target = value[0].replace(/\/\*$/, '')
+            const root = this.info.root.replace(/^\.\//g, '');
+
+            let target = value[0].replace(/(?:^\.\/)|(?:\/\*$)/g, '');
+            console.log(target, this.info.root, this.absoluteRoot, this.projectRoot);
             target = target.replace(new RegExp(`^${this.info.root}`), '');
-            target = target.replace(/^\/|\/$/, '');
-            target = path.join(this.absoluteRoot, target);
+            target = target.replace(/^\/|\/$/g, '');
+            target = path.resolve(this.absoluteRoot, target);
+            console.log(alias, target);
             result.push({ alias, target });
         }
         this._alias = result;
