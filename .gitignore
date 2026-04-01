@@ -1,0 +1,7 @@
+# Build setting
+**/node_modules/
+**/build/
+**/.**
+**/*.log
+**/*.env
+!.gitignore
