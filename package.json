@@ -1,7 +1,7 @@
 {
   "name": "depflow",
   "description": "is a simple dependency manager based on github repositories",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "main": "build/bin.js",
   "type": "module",
   "bin": {
@@ -9,8 +9,8 @@
   },
   "scripts": {
     "dev": "npx tsc --watch",
-    "build": "npx tsc",
-    "prepare": "npm run build"
+    "compile": "npx tsc",
+    "prepare": "npm run compile"
   },
   "license": "Apache-2.0",
   "repository": {
@@ -20,7 +20,7 @@
   "author": {
     "name": "NetFeez",
     "email": "netfeez.dev@gmail.com",
-    "url": "https://NetFeez-Labs.com"
+    "url": "https://NetFeez.github.io"
   },
   "keywords": [
     "dependency",
@@ -33,10 +33,10 @@
     "README.md"
   ],
   "dependencies": {
-    "vortez": "^5.0.0-dev.14"
+    "vortez": "^5.0.0"
   },
   "devDependencies": {
-    "@types/node": "^24.10.1",
-    "typescript": "^5.9.3"
+    "@types/node": "^25.6.0",
+    "typescript": "^6.0.2"
   }
 }
