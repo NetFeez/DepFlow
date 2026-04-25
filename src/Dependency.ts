@@ -8,13 +8,15 @@ import { ChildProcess, ChildProcessWithoutNullStreams, spawn } from "child_proce
 
 import Git from "./Git.js";
 import File from "./File.js";
+import schemas from "./schemas.js";
+import Validator from "./Validator.js";
 
 export class Dependency implements Dependency.Dependency {
     public static include: string[] = [ '*' ];
     public readonly name: string;
     public readonly repo: Dependency.repo;
     public readonly branch?: string;
-    public readonly builder?: Dependency.Builder;
+    public readonly builder: Dependency.Builder[];
     /**
      * Create a new dependency
      * @param dependency Dependency to create
@@ -22,6 +24,7 @@ export class Dependency implements Dependency.Dependency {
      * @returns New dependency
      */
     public constructor(dependency: Dependency.Dependency) {
+        Validator.validateRepo(dependency.repo);
         this.name = dependency.name;
         this.repo = dependency.repo;
         this.branch = dependency.branch;
@@ -111,7 +114,8 @@ export class Dependency implements Dependency.Dependency {
         finally { shell.kill(); }
         return output;
     }
-    protected async move(move: Dependency.Builder.MoveType): Promise<string[]> {
+    protected async move(move: Dependency.Builder['move']): Promise<string[]> {
+        if (!move) return [];
         const output: string[] = [];
         if (typeof move === 'string' || Array.isArray(move)) {
             const moves = Array.isArray(move) ? move : [ move ];
@@ -223,7 +227,8 @@ export class Dependency implements Dependency.Dependency {
      * @param builder Builder to get folders from
      * @returns Folders
      */
-    public static getAllOutFolders(builder: Dependency.Builder.MoveType): string[] {
+    public static getAllOutFolders(builder: Dependency.Builder['move']): string[] {
+        if (!builder) return [];
         const folders: string[] = [];
         if (typeof builder === 'string') folders.push(builder);
         else if (Array.isArray(builder)) folders.push(...builder);
@@ -236,24 +241,10 @@ export class Dependency implements Dependency.Dependency {
 
 export namespace Dependency {
     export type logCallback = (messages: string[]) => void;
-    export type repo = `https://github.com/${string}/${string}.git`;
-    export namespace Builder {
-        export interface Move {
-            [key: string]: string | string[]
-        }
-        export type MoveType = string | string[] | Move;
-        export interface Step {
-            run?: string | string[] | undefined;
-            move?: MoveType;
-        }
-    }
-    export type Builder = Builder.Step[];
-    export interface Dependency {
-        name: string;
-        repo: repo;
-        branch?: string;
-        builder?: Builder;
-    }
+    export type repo = `https://github.com/${string}/${string}.git` | `git@github.com:${string}/${string}.git`;
+    export type Builder = schemas.builder['inferToProcess'];
+    export type Dependency = schemas.dependency['infer'];
+    export type newDependency = schemas.dependency['inferToProcess'];
     export interface manageOptions { force?: boolean; }
 }
 
