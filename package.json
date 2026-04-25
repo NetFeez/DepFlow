@@ -1,11 +1,11 @@
 {
   "name": "depflow",
   "description": "is a simple dependency manager based on github repositories",
-  "version": "1.1.2",
-  "main": "build/bin.js",
+  "version": "2.0.0-dev.1",
+  "main": "build/bin/bin.js",
   "type": "module",
   "bin": {
-    "dep": "build/bin.js"
+    "dep": "build/bin/bin.js"
   },
   "scripts": {
     "dev": "npx tsc --watch",
@@ -33,6 +33,7 @@
     "README.md"
   ],
   "dependencies": {
+    "@netfeez/common": "^2.1.0",
     "vortez": "^5.0.0"
   },
   "devDependencies": {
