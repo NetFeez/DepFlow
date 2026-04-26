@@ -11,7 +11,6 @@ export class Utils {
     public static getRepoName = (repo: string): string => {
         const match = repo.match(Utils.REPO_REGEX);
         if (match) {
-            // Buscamos cuáles grupos capturaron datos (1,2 para HTTPS o 3,4 para SSH)
             const user = match[1] || match[3];
             const repoName = match[2] || match[4];
             return `${user}.${repoName}`;
@@ -78,6 +77,23 @@ export class Utils {
             return true;
         } catch (error) { return false; }
     }
+    public static debounce<Args extends any[]>(
+        fn: Utils.DebouncedFunction<Args>,
+        delay: number
+    ): Utils.DebouncedFunction<Args> {
+        let timeoutId: NodeJS.Timeout | null = null;
+
+        return function(this: any, ...args: Args) {
+            if (timeoutId) clearTimeout(timeoutId);
+            
+            timeoutId = setTimeout(() => {
+                fn.apply(this, args);
+                timeoutId = null;
+            }, delay);
+        };
+    }
 }
-export namespace Utils {}
+export namespace Utils {
+    export type DebouncedFunction<Args extends any[]> = (...args: Args) => void;
+}
 export default Utils;

@@ -1,4 +1,6 @@
-import { promises as FS, readFile } from 'fs';
+import { promises as FS, readFile } from 'node:fs';
+
+import { Utilities } from 'vortez';
 
 export class File {
     /**
@@ -80,6 +82,30 @@ export class File {
     static async mkdir(path: string, options?: { recursive?: boolean }): Promise<void> {
         if (await this.exists(path)) throw new Error(`Path ${path} already exists.`);
         await FS.mkdir(path, options);
+    }
+    
+    /**
+     * Recursively retrieves all files with specified extensions from a given directory.
+     * It uses fs.readdir with the "withFileTypes" option to efficiently determine if an entry is a file or a directory.
+     * For directories, it calls itself recursively to gather files from subdirectories. For files, it checks if their extensions match the provided list and includes them in the result.
+     * This method returns a flat array of file paths that can be processed by the path resolver.
+     * @param dir The directory to scan for files.
+     * @param extensions An array of file extensions to filter the results (e.g., ['.js', '.ts']).
+     * @returns A promise that resolves to an array of file paths matching the specified extensions.
+     */
+    public static async getAllFiles(dir: string, extensions: string[]): Promise<string[]> {
+        const result: string[] = [];
+        const entries = await FS.readdir(dir, { withFileTypes: true });
+        
+        for (const entry of entries) {
+            const fullPath = Utilities.Path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+                const files = await File.getAllFiles(fullPath, extensions);
+                result.push(...files);
+            }
+            else if (extensions.some(ext => fullPath.endsWith(ext))) result.push(fullPath);
+        }
+        return result;
     }
 }
 

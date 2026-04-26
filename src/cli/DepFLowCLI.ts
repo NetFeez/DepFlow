@@ -6,12 +6,18 @@ import Config from "../config/Config.js";
 import schemas from "../config/schemas.js";
 import Dependency from "../support/Dependency.js";
 import Tsconfig from "../config/Tsconfig.js";
-import pathResolver, { PathResolver } from "../support/PathResolver.js";
+import pathResolver, { PathResolver } from "../support/Resolver/PathResolver.js";
+import ImportMap from "../config/ImportMap.js";
+import path from "node:path";
 
 export class DepFlowCLI extends Utilities.DebugUI {
+    protected readonly projectRoot: string;
     public constructor(
         public readonly configPath: string = 'depFlow.json'
     ) { super();
+        const absoluteConfigPath = path.resolve(process.cwd(), this.configPath);
+        this.projectRoot = path.dirname(absoluteConfigPath);
+
         this.addCommand('add', this.commandAdd, { usage: 'dep add <repo_url> [name]', description: 'Add a dependency to the configuration file.' });
         this.addCommand('remove', this.commandRemove, { usage: 'dep remove <name> | <repo_url>', description: 'Remove a dependency from the configuration file by name or repo URL.' });
         this.addCommand('install', this.commandInstall, { usage: 'dep install [name1 name2 ...]', description: 'Install dependencies. If names are provided, only those dependencies will be installed.' });
@@ -19,8 +25,6 @@ export class DepFlowCLI extends Utilities.DebugUI {
         this.addCommand('list', this.list, { usage: 'dep list', description: 'List all dependencies in the configuration file.' });
         this.addCommand('rewrite-paths', this.rewritePaths, { usage: 'dep rewrite-paths [--watch] [--cdn]', description: 'Resolve and rewrite paths in built files based on depFlow configuration.' });
         this.addCommand('sync', this.commandSync, { usage: 'dep sync', description: 'Syncs depFlow.json with tsconfig.json and generates the importmap.'  });
-
-
     }
     public async commandAdd(command: string, args: string[]) {
         this.out.info(`&C(255,180,220)╭──────────────────────────────────────────────────`);
@@ -112,7 +116,7 @@ export class DepFlowCLI extends Utilities.DebugUI {
             this.out.info(`&C(255,180,220)│ Mode: &C3${useCDN ? 'CDN' : 'Local'}`);
             if (watch) this.out.info(`&C(255,180,220)│ Watcher: &C2Enabled`);
 
-            const resolver = new pathResolver(config);
+            const resolver = new pathResolver(config, { logger: this.out });
 
             if (watch) await resolver.watch(mode);
             else await resolver.rewritePaths(mode);
@@ -125,12 +129,24 @@ export class DepFlowCLI extends Utilities.DebugUI {
         try {
             const useCDN = args.includes('--cdn');
             const mode: pathResolver.Mode = useCDN ? 'cdn' : 'local';
-
+            
+            
             const config = await Config.load(this.configPath);
             const resolver = new pathResolver(config, { logger: this.out });
-
-            await resolver.syncTsConfig();
-            await resolver.syncImportMap(mode);
+            
+            const tsconfigFile = config.tsconfig;
+            const importMapFile = config.importmap;
+            
+            if (tsconfigFile) {
+                const tsconfig = await Tsconfig.load(this.projectRoot, tsconfigFile, { logger: this.out });
+                tsconfig.updatePaths(resolver.aliases);
+                await tsconfig.save();
+            } else this.out.warn(`&C(255,180,220)│ No tsconfig file specified in configuration. Skipping tsconfig synchronization.`);
+            if (importMapFile) {
+                const importmap = await ImportMap.load(this.projectRoot, importMapFile, { logger: this.out });
+                importmap.updateImports(resolver.aliases, mode);
+                await importmap.save();
+            } else this.out.warn(`&C(255,180,220)│ No import map file specified in configuration. Skipping import map synchronization.`);
 
             this.out.info(`&C(255,180,220)│ &C2Successfully synced all configurations.`);
         } catch (error: any) { this.out.error(`&C(255,180,220)│ &C1Error during sync: ${error.message}`); }
