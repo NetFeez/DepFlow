@@ -6,7 +6,7 @@ import Config from "../config/Config.js";
 import schemas from "../config/schemas.js";
 import Dependency from "../support/Dependency.js";
 import Tsconfig from "../config/Tsconfig.js";
-import pathResolver from "../support/PathResolver.js";
+import pathResolver, { PathResolver } from "../support/PathResolver.js";
 
 export class DepFlowCLI extends Utilities.DebugUI {
     public constructor(
@@ -107,14 +107,15 @@ export class DepFlowCLI extends Utilities.DebugUI {
             const config = await Config.load(this.configPath);
             const watch = args.includes('--watch') || args.includes('-w');
             const useCDN = args.includes('--cdn');
+            const mode: PathResolver.Mode = useCDN ? 'cdn' : 'local';
 
             this.out.info(`&C(255,180,220)│ Mode: &C3${useCDN ? 'CDN' : 'Local'}`);
             if (watch) this.out.info(`&C(255,180,220)│ Watcher: &C2Enabled`);
 
-            const resolver = new pathResolver(config, { mode: useCDN ? 'cdn' : 'local' });
+            const resolver = new pathResolver(config);
 
-            if (watch) await resolver.watch();
-            else await resolver.rewritePaths();
+            if (watch) await resolver.watch(mode);
+            else await resolver.rewritePaths(mode);
         } catch (error: any) { this.out.error(`&C(255,180,220)│ &C1${error.message || error}`); }
         finally { this.out.info(`&C(255,180,220)╰──────────────────────────────────────────────────`); }
     }
@@ -123,14 +124,14 @@ export class DepFlowCLI extends Utilities.DebugUI {
         this.out.info(`&C(255,180,220)│ Synchronizing configurations...`);
         try {
             const useCDN = args.includes('--cdn');
+            const mode: pathResolver.Mode = useCDN ? 'cdn' : 'local';
 
             const config = await Config.load(this.configPath);
-            const resolver = new pathResolver(config, {
-                mode: useCDN ? 'cdn' : 'local',
-                logger: this.out
-            });
+            const resolver = new pathResolver(config, { logger: this.out });
+
             await resolver.syncTsConfig();
-            await resolver.syncImportMap();
+            await resolver.syncImportMap(mode);
+
             this.out.info(`&C(255,180,220)│ &C2Successfully synced all configurations.`);
         } catch (error: any) { this.out.error(`&C(255,180,220)│ &C1Error during sync: ${error.message}`); }
         finally { this.out.info(`&C(255,180,220)╰──────────────────────────────────────────────────`); }

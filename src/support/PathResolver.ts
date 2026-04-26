@@ -7,7 +7,7 @@ import path from 'path';
 import syncFs, { promises as fs } from 'fs';
 import { Logger, Utilities } from 'vortez';
 import File from './File.js';
-import { schemas } from '../config/schemas.js';
+import schemas from '../config/schemas.js';
 
 export class PathResolver {
     public static readonly IMPORT_REGEX = /(from\s+['"])([^'"]+)(['"])/g;
@@ -72,7 +72,7 @@ export class PathResolver {
      * applies path replacements based on the configured aliases, and updates the files in place. It also logs the process and results.
      * @param mode The mode of resolution, either 'local' or 'cdn', which determines whether to use the local or CDN target for the alias replacement.
      */
-    public async rewritePaths(mode: PathResolver.Mode = 'local'): Promise<void> {
+    public async rewritePaths(mode: PathResolver.Mode): Promise<void> {
         this.logger.log(`&C2Starting path resolver in &C3${mode} &C2mode...`);
         
         if (!await File.exists(this.absoluteOutDir)) {
@@ -170,14 +170,12 @@ export class PathResolver {
                 let localTarget = path.relative(this.projectRoot, aliasObj.targets.local);
                 localTarget = Utilities.Path.normalize(localTarget);
 
-                if (aliasObj.isWildcard) {
-                    localTarget = `${localTarget.endsWith('/') ? localTarget : localTarget + '/'}*`;
-                }
+                if (aliasObj.isWildcard) { localTarget = `${localTarget.endsWith('/') ? localTarget : localTarget + '/'}*`; }
 
                 tsConfigContent.compilerOptions.paths[key] = [localTarget];
             }
-
-            await File.write(tsconfigPath, JSON.stringify(tsConfigContent, null, 4));
+            const json = JSON.stringify(tsConfigContent, null, 4);
+            await File.write(tsconfigPath, json);
             this.logger.log(`&C2Updated paths in &C4${tsconfigName}`);
         } catch (error: any) {
             this.logger.error(`Failed to sync tsconfig:`, error.message);
@@ -189,7 +187,7 @@ export class PathResolver {
      * It also logs the process and any issues encountered, such as missing import map configuration or write errors.
      * This method is useful for projects that utilize import maps for module resolution, ensuring that the import map is always up to date with the configured aliases and can be used effectively during development and deployment.
      */
-    public async syncImportMap(mode: 'local' | 'cdn'): Promise<void> {
+    public async syncImportMap(mode: PathResolver.Mode): Promise<void> {
         if (!this.config.importmap) return void this.logger.warn(`&C3Warning: No importmap specified in config.`);
         const importMapName = this.config.importmap;
         const importMapPath = path.resolve(this.projectRoot, importMapName);
@@ -230,7 +228,7 @@ export class PathResolver {
      * This method allows for real-time updates to the resolved paths during development, ensuring that any changes to the output files are immediately reflected in the path resolution without needing to manually re-run the resolver.
      */
     public async watch(mode: PathResolver.Mode): Promise<void> {
-        await this.rewritePaths();
+        await this.rewritePaths(mode);
         this.logger.log(`&C2Watching for changes in &C4${this.absoluteOutDir}...`);
         
         const queue = new Map<string, NodeJS.Timeout>();
