@@ -7,9 +7,10 @@ import path from 'path';
 import syncFs, { promises as fs } from 'fs';
 import { Logger, Utilities } from 'vortez';
 import File from './File.js';
-import schemas from '../config/schemas.js';
+import schemas, { pathResolverEntry } from '../config/schemas.js';
 
 export class PathResolver {
+    public static readonly WILDCARD_SUFFIX_REGEX = /\/\*?$/;
     public static readonly IMPORT_REGEX = /(from\s+['"])([^'"]+)(['"])/g;
     public static readonly PROJECT_ROOT = process.cwd();
     public static readonly EXTENSIONS = ['.js', '.d.ts', '.mjs', '.cjs'];
@@ -34,33 +35,35 @@ export class PathResolver {
         if (this.vCompiledAliases) return this.vCompiledAliases;
 
         const result: PathResolver.ResolvedAlias[] = [];
-        const allDeps = [...(this.config.dependencies || []), ...(this.config.npmDependencies || [])];
+        const allDeps = [
+            ...(this.config.dependencies || []),
+            ...(this.config.npmDependencies || [])
+        ];
 
         for (const dep of allDeps) {
             if (typeof dep !== 'object' || !dep.resolver) continue;
 
             for (const entry of dep.resolver) {
-                const isWildcard = entry.alias.endsWith('/*');
-                const cleanAlias = entry.alias.replace(/\/\*$/, '');
+                const isWildcard = PathResolver.isWildcard(entry.alias);
+                const alias = PathResolver.removeWildcardSuffix(entry.alias);
 
-                const rawLocal = typeof entry.target === 'string' ? entry.target : entry.target.local;
-                const cleanLocal = rawLocal.replace(/\/\*$/, '');
-                const localTarget = path.isAbsolute(cleanLocal) 
-                    ? cleanLocal 
-                    : path.resolve(this.projectRoot, cleanLocal);
+                const rawLocal = typeof entry.target !== 'string'
+                    ? entry.target.local
+                    : entry.target;
+                const cleanLocal = PathResolver.removeWildcardSuffix(rawLocal);
 
-                let cdnTarget: string | undefined;
-                if (typeof entry.target === 'object' && entry.target.cdn) {
-                    cdnTarget = entry.target.cdn.replace(/\/\*$/, '');
-                }
+                const localTarget = !path.isAbsolute(cleanLocal) 
+                    ? path.resolve(this.projectRoot, cleanLocal)
+                    : cleanLocal;
+
+                let cdnTarget: string | undefined = typeof entry.target === 'object' && entry.target.cdn
+                    ? PathResolver.removeWildcardSuffix(entry.target.cdn)
+                    : undefined;
 
                 result.push({
-                    alias: cleanAlias,
+                    alias,
                     isWildcard,
-                    targets: {
-                        local: localTarget,
-                        cdn: cdnTarget
-                    }
+                    targets: { local: localTarget, cdn: cdnTarget }
                 });
             }
         }
@@ -170,6 +173,7 @@ export class PathResolver {
                 let localTarget = path.relative(this.projectRoot, aliasObj.targets.local);
                 localTarget = Utilities.Path.normalize(localTarget);
 
+                console.log(aliasObj);
                 if (aliasObj.isWildcard) { localTarget = `${localTarget.endsWith('/') ? localTarget : localTarget + '/'}*`; }
 
                 tsConfigContent.compilerOptions.paths[key] = [localTarget];
@@ -266,6 +270,22 @@ export class PathResolver {
             else if (extensions.some(ext => fullPath.endsWith(ext))) result.push(fullPath);
         }
         return result;
+    }
+    /**
+     * Determines if a given alias string is a wildcard alias by checking if it ends with "/*" or just "/". This is used to identify aliases that represent directory mappings, allowing for more flexible path resolution where any subpath under the alias can be matched and replaced accordingly.
+     * @param alias The alias string to check (e.g., "components/*" or "utils/").
+     * @returns A boolean indicating whether the alias is a wildcard alias.
+     */
+    public static isWildcard(alias: string): boolean {
+        return PathResolver.WILDCARD_SUFFIX_REGEX.test(alias);
+    }
+    /**
+     * Removes the wildcard suffix (either "/*" or "/") from a given alias string, returning the base alias without the wildcard. This is useful for normalizing aliases when processing them, allowing the resolver to work with a consistent format regardless of whether the original alias was defined as a wildcard or not.
+     * @param alias The alias string from which to remove the wildcard suffix (e.g., "components/*" or "utils/").
+     * @returns The alias string with the wildcard suffix removed (e.g., "components" or "utils").
+     */
+    public static removeWildcardSuffix(alias: string): string {
+        return alias.replace(PathResolver.WILDCARD_SUFFIX_REGEX, '');
     }
 }
 
