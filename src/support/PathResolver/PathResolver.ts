@@ -3,14 +3,13 @@
  * @description Utility for path resolution with Local/CDN support and dual path fixing.
  * @license Apache-2.0
  */
-import syncFs, { promises as fs } from 'node:fs';
-import path from "node:path";
+import PATH from "node:path";
+import FS, { promises as FSP } from 'node:fs';
 
-import { Logger } from "vortez";
+import { File } from '@netfeez/common-node';
+import { Logger } from "@netfeez/vterm";
 
 import Utils from '../Utils.js';
-import File from '../File.js';
-
 import schemas from '../../config/schemas.js';
 import PathRewriter from './PathRewriter.js';
 import AliasCompiler from './AliasCompiler.js';
@@ -28,11 +27,11 @@ export class PathResolver {
         public readonly config: schemas.config['infer'],
         public readonly options: PathResolver.Options = {},
     ) {
-        this.logger = options.logger || new Logger({ prefix: 'PathResolver' });
+        this.logger = options.logger || new Logger({ name: 'PATH-RW' });
         
         const outDir = config.outDir || '.';
-        this.absoluteOutDir = !path.isAbsolute(outDir)
-            ? path.resolve(PathResolver.PROJECT_ROOT, outDir)
+        this.absoluteOutDir = !PATH.isAbsolute(outDir)
+            ? PATH.resolve(PathResolver.PROJECT_ROOT, outDir)
             : outDir;
 
         this.aliases = new AliasCompiler(PathResolver.PROJECT_ROOT).compile(config);
@@ -65,12 +64,12 @@ export class PathResolver {
      */
     protected async processFile(file: string, mode: PathResolver.Mode): Promise<boolean> {
         try {
-            const content = await fs.readFile(file, 'utf8');
+            const content = await FSP.readFile(file, 'utf8');
             const newContent = this.rewriter.rewrite(content, file, mode);
 
             if (content === newContent) return false;
             
-            await fs.writeFile(file, newContent, 'utf8');
+            await FSP.writeFile(file, newContent, 'utf8');
             return true;
         } catch (error: any) {
             this.logger.error(`Failed to process file &C4${file}:`, error.message);
@@ -95,13 +94,13 @@ export class PathResolver {
             }
         }, 300);
 
-        syncFs.watch(this.absoluteOutDir, { recursive: true }, (eventType, filename) => {
+        FS.watch(this.absoluteOutDir, { recursive: true }, (eventType, filename) => {
             if (!filename) return;
             
             const isTargetExtension = PathResolver.EXTENSIONS.some(ext => filename.endsWith(ext));
             if (!isTargetExtension) return;
 
-            const fullPath = path.join(this.absoluteOutDir, filename);
+            const fullPath = PATH.join(this.absoluteOutDir, filename);
             debouncedProcessor(fullPath, filename);
         });
     }

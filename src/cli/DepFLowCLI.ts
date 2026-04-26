@@ -1,4 +1,4 @@
-import { Utilities } from "vortez";
+import { DebugUI } from "@netfeez/vterm";
 
 import Validator from "../support/Validator.js";
 import Utils from "../support/Utils.js";
@@ -10,7 +10,7 @@ import pathResolver, { PathResolver } from "../support/PathResolver/PathResolver
 import ImportMap from "../config/ImportMap.js";
 import path from "node:path";
 
-export class DepFlowCLI extends Utilities.DebugUI {
+export class DepFlowCLI extends DebugUI {
     protected readonly projectRoot: string;
     public constructor(
         public readonly configPath: string = 'depFlow.json'

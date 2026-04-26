@@ -1,5 +1,4 @@
-import { Utilities } from "vortez";
-import File from "./File.js";
+import { File, Path } from '@netfeez/common-node';
 
 export class Utils {
     protected static REPO_REGEX = /^(?:https:\/\/github\.com\/([^/]+)\/([^/.]+)(?:\.git)?|git@github\.com:([^/]+)\/([^/.]+)(?:\.git)?)$/;
@@ -48,10 +47,10 @@ export class Utils {
      */
     public static async addVscodeValidation(flowPath: string, schemaObject: object) {
         const root = process.cwd();
-        const internalDir = Utilities.Path.join(root, '.depflow');
-        const schemaLocalPath = Utilities.Path.join(internalDir, 'schema.json');
-        const vscodeDir = Utilities.Path.join(root, '.vscode');
-        const settingsPath = Utilities.Path.join(vscodeDir, 'settings.json');
+        const internalDir = Path.join(root, '.depflow');
+        const schemaLocalPath = Path.join(internalDir, 'schema.json');
+        const vscodeDir = Path.join(root, '.vscode');
+        const settingsPath = Path.join(vscodeDir, 'settings.json');
 
         try {
             if (!await File.exists(internalDir)) await File.mkdir(internalDir, { recursive: true });

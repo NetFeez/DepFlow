@@ -3,9 +3,9 @@
  * @description Utility to help with File operations.
  * @license Apache-2.0
  */
+import { File } from '@netfeez/common-node';
 
 import schemas from './schemas.js';
-import File from '../support/File.js';
 
 export class Config {
     /**

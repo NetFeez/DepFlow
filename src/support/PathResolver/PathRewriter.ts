@@ -1,5 +1,7 @@
-import path from "node:path";
-import { Utilities } from "vortez";
+import PATH from "node:path";
+
+import { Path } from "@netfeez/common-node";
+
 import AliasCompiler from "./AliasCompiler.js";
 
 export class PathRewriter {
@@ -30,18 +32,18 @@ export class PathRewriter {
                 const subPath = modulePath.substring(aliasCfg.alias.length + 1);
                 resolvedPath = isCDN 
                     ? `${baseTarget.replace(/\/$/, '')}/${subPath}`
-                    : path.join(baseTarget, subPath);
+                    : PATH.join(baseTarget, subPath);
             } else {
                 resolvedPath = baseTarget;
             }
 
             if (isCDN) return `${prefix}${resolvedPath}${suffix}`;
 
-            const currentFileDir = path.dirname(filePath);
-            let relativeTarget = path.relative(currentFileDir, resolvedPath);
+            const currentFileDir = PATH.dirname(filePath);
+            let relativeTarget = PATH.relative(currentFileDir, resolvedPath);
             if (!relativeTarget.startsWith('.')) relativeTarget = `./${relativeTarget}`;
             
-            return `${prefix}${Utilities.Path.normalize(relativeTarget)}${suffix}`;
+            return `${prefix}${Path.normalize(relativeTarget)}${suffix}`;
         });
     }
 }

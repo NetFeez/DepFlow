@@ -1,9 +1,9 @@
-import path from 'node:path';
-import { Logger, Utilities } from 'vortez';
+import PATH from 'node:path';
 
-import File from "../support/File.js";
+import { Logger } from '@netfeez/vterm';
+import { File, Path } from '@netfeez/common-node';
+
 import AliasCompiler from '../support/PathResolver/AliasCompiler.js';
-import { isWritable } from 'node:stream';
 
 export class ImportMap {
     protected logger: Logger;
@@ -14,7 +14,7 @@ export class ImportMap {
         protected filename: string,
         options: ImportMap.Options = {}
     ) { 
-        this.logger = options.logger || new Logger({ prefix: 'IMP-MAP' }); 
+        this.logger = options.logger || new Logger({ name: 'IMP-MAP' }); 
     }
 
     /**
@@ -34,9 +34,9 @@ export class ImportMap {
                 : aliasObj.targets.local;
 
             if (target === aliasObj.targets.local) {
-                target = path.relative(this.projectRoot, target);
+                target = PATH.relative(this.projectRoot, target);
                 if (!target.startsWith('./')) target = `./${target}`;
-                target = Utilities.Path.normalize(target);
+                target = Path.normalize(target);
             }
             if (aliasObj.isWildcard) {
                 if (!target.endsWith('/')) target += '/';
@@ -49,9 +49,9 @@ export class ImportMap {
         await ImportMap.save(this.projectRoot, filename, this.data, { logger: this.logger });
     }
     public static async save(projectRoot: string, filename: string, data: ImportMap.Data, options: ImportMap.Options = {}): Promise<void> {
-        const logger = options.logger || new Logger({ prefix: 'IMP-MAP' });
-        const importMapPath = path.resolve(projectRoot, filename);
-        const folder = path.dirname(importMapPath);
+        const logger = options.logger || new Logger({ name: 'IMP-MAP' });
+        const importMapPath = PATH.resolve(projectRoot, filename);
+        const folder = PATH.dirname(importMapPath);
         if (!await File.exists(folder)) await File.mkdir(folder, { recursive: true });
         const json = JSON.stringify(data, null, 4);
         await File.write(importMapPath, json);
@@ -68,8 +68,8 @@ export class ImportMap {
      * @returns A promise that resolves to an instance of ImportMap initialized with the loaded or default data.
      */
     public static async load(projectRoot: string, filename: string, options: ImportMap.Options = {}): Promise<ImportMap> {
-        const logger = options.logger || new Logger({ prefix: 'IMP-MAP' });
-        const importMapPath = path.resolve(projectRoot, filename);
+        const logger = options.logger || new Logger({ name: 'IMP-MAP' });
+        const importMapPath = PATH.resolve(projectRoot, filename);
         let data: ImportMap.Data = { imports: {} };
         if (!await File.exists(importMapPath)) {
             logger.warn(`&C3${filename} not found. Creating defaults...`);

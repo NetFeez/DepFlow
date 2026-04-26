@@ -1,8 +1,8 @@
-import path from 'node:path';
+import PATH from 'node:path';
 
-import { Logger, Utilities } from 'vortez';
+import { Logger } from '@netfeez/vterm';
+import { File, Path } from '@netfeez/common-node';
 
-import File from "../support/File.js";
 import schemas from "./schemas.js";
 import AliasCompiler from '../support/PathResolver/AliasCompiler.js';
 
@@ -14,7 +14,7 @@ export class Tsconfig {
         protected projectRoot: string,
         protected filename: string,
         options: Tsconfig.Options = {}
-    ) { this.logger = options.logger || new Logger({ prefix: 'TS-CFG' }); }
+    ) { this.logger = options.logger || new Logger({ name: 'TS-CFG' }); }
     /**
      * Updates the paths in the tsconfig data based on the provided compiled aliases.
      * It ensures that the compilerOptions and paths properties exist in the tsconfig data, and then iterates through the compiled aliases to construct the appropriate path mappings.
@@ -29,8 +29,8 @@ export class Tsconfig {
         for (const aliasObj of aliases) {
             const key = aliasObj.isWildcard ? `${aliasObj.alias}/*` : aliasObj.alias;
             
-            let target = path.relative(this.projectRoot, aliasObj.targets.local);
-            target = Utilities.Path.normalize(target);
+            let target = PATH.relative(this.projectRoot, aliasObj.targets.local);
+            target = Path.normalize(target);
 
             if (aliasObj.isWildcard) {
                 const suffix = target.endsWith('/') ? '*' : '/*';
@@ -62,9 +62,9 @@ export class Tsconfig {
       * @throws Will throw an error if there is an issue during the save process, which can be caught by the caller to handle it appropriately.
      */
     public static async save(projectRoot: string, filename: string = 'tsconfig.json', data: Tsconfig.Data, options: Tsconfig.Options = {}): Promise<void> {
-        const logger = options.logger || new Logger({ prefix: 'TS-CFG' });
-        const tsconfigPath = path.resolve(projectRoot, filename);
-        const folder = path.dirname(tsconfigPath);
+        const logger = options.logger || new Logger({ name: 'TS-CFG' });
+        const tsconfigPath = PATH.resolve(projectRoot, filename);
+        const folder = PATH.dirname(tsconfigPath);
         if (!await File.exists(folder)) await File.mkdir(folder, { recursive: true });
         const json = JSON.stringify(data, null, 4);
         await File.write(tsconfigPath, json);
@@ -82,8 +82,8 @@ export class Tsconfig {
       * @throws Will throw an error if there is an issue during the load process, which
      */
     public static async load(projectRoot: string, filename: string, options: Tsconfig.Options): Promise<Tsconfig> {
-        const logger = options.logger || new Logger({ prefix: 'TS-CFG' });
-        const tsconfigPath = path.resolve(projectRoot, filename);
+        const logger = options.logger || new Logger({ name: 'TS-CFG' });
+        const tsconfigPath = PATH.resolve(projectRoot, filename);
         let data: Tsconfig.Data;
         if (!await File.exists(tsconfigPath)) {
             logger.warn(`&C3${filename} not found. Creating defaults...`);

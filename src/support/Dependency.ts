@@ -4,14 +4,14 @@
  * @license Apache-2.0
  */
 import { promises as FS } from "fs";
-import { ChildProcess, ChildProcessWithoutNullStreams, spawn } from "child_process";
+import { ChildProcessWithoutNullStreams, spawn } from "child_process";
 
-import Git from "./Git.js";
-import File from "./File.js";
+import { File, Path } from '@netfeez/common-node';
+
 import schemas from "../config/schemas.js";
+import Git from "./Git.js";
 import Validator from "./Validator.js";
 import Config from "../config/Config.js";
-import { Utilities } from "vortez";
 
 export class Dependency implements Dependency.Dependency {
     public static include: string[] = [ '*' ];
@@ -34,8 +34,8 @@ export class Dependency implements Dependency.Dependency {
     }
     /** Get the folder of the dependency */
     public get folder(): string {
-        let path = Utilities.Path.join(this.config.flowFolder, this.name);
-        path = Utilities.Path.normalize(path);
+        let path = Path.join(this.config.flowFolder, this.name);
+        path = Path.normalize(path);
         return path;
     }
     /**
