@@ -1,12 +1,12 @@
 import { Utilities } from "vortez";
 
-import Validator from "../Validator.js";
-import { Utils } from "../Utils.js";
-import Config from "../Config.js";
-import schemas from "../schemas.js";
-import Dependency from "../Dependency.js";
-import { Tsconfig } from "../Tsconfig.js";
-import { PathFixer } from "../PathFixer.js";
+import Validator from "../support/Validator.js";
+import Utils from "../support/Utils.js";
+import Config from "../config/Config.js";
+import schemas from "../config/schemas.js";
+import Dependency from "../support/Dependency.js";
+import Tsconfig from "../config/Tsconfig.js";
+import pathResolver from "../support/PathResolver.js";
 
 export class DepFlowCLI extends Utilities.DebugUI {
     public constructor(
@@ -17,7 +17,10 @@ export class DepFlowCLI extends Utilities.DebugUI {
         this.addCommand('install', this.commandInstall, { usage: 'dep install [name1 name2 ...]', description: 'Install dependencies. If names are provided, only those dependencies will be installed.' });
         this.addCommand('uninstall', this.uninstall, { usage: 'dep uninstall [name1 name2 ...]', description: 'Uninstall dependencies. If names are provided, only those dependencies will be uninstalled.' });
         this.addCommand('list', this.list, { usage: 'dep list', description: 'List all dependencies in the configuration file.' });
-        this.addCommand('rewrite-paths', this.rewritePaths, { usage: 'dep rewrite-paths [--watch] [-p <tsconfig_path>]', description: 'Rewrite paths in tsconfig.json based on the dependencies. Use --watch to keep watching for changes.' });
+        this.addCommand('rewrite-paths', this.rewritePaths, { usage: 'dep rewrite-paths [--watch] [--cdn]', description: 'Resolve and rewrite paths in built files based on depFlow configuration.' });
+        this.addCommand('sync', this.commandSync, { usage: 'dep sync', description: 'Syncs depFlow.json with tsconfig.json and generates the importmap.'  });
+
+
     }
     public async commandAdd(command: string, args: string[]) {
         this.out.info(`&C(255,180,220)╭──────────────────────────────────────────────────`);
@@ -56,7 +59,7 @@ export class DepFlowCLI extends Utilities.DebugUI {
             if (toInstall.length === 0) throw new Error(args.length > 0 ? 'Specified dependencies not found.' : 'No dependencies to install.');
             for (const dep of toInstall) {
                 this.out.info(`&C(255,180,220)│ Installing "${dep.name}" from "${dep.repo}"...`);
-                const dependency = new Dependency(dep);
+                const dependency = new Dependency(config, dep);
                 const result = await dependency.install();
                 this.out.info(`&C(255,180,220)│ ${result.join('\n').replace(/\n/g, '\n&C(255,180,220)│ ')}`);
                 this.out.info(`&C(255,180,220)│ &C3Installed dependency: &C3${dep.name}`);
@@ -64,6 +67,7 @@ export class DepFlowCLI extends Utilities.DebugUI {
             }
         } catch (error) { this.out.error(`&C(255,180,220)│ &C1${error}`); }
         finally { this.out.info(`&C(255,180,220)╰──────────────────────────────────────────────────`); }
+        this.commandSync('sync', []);
     }
     public async uninstall(command: string, args: string[]) {
         this.out.info(`&C(255,180,220)╭──────────────────────────────────────────────────`);
@@ -75,7 +79,7 @@ export class DepFlowCLI extends Utilities.DebugUI {
             if (toUninstall.length === 0) throw new Error(args.length > 0 ? 'Specified dependencies not found.' : 'No dependencies to uninstall.');
             for (const dep of toUninstall) {
                 this.out.info(`&C(255,180,220)│ Uninstalling "${dep.name}" from "${dep.repo}"...`);
-                const dependency = new Dependency(dep);
+                const dependency = new Dependency(config, dep);
                 const result = await dependency.uninstall();
                 this.out.info(`&C(255,180,220)│ ${result.join('\n').replace(/\n/g, '\n&C(255,180,220)│ ')}`);
                 this.out.info(`&C(255,180,220)│ &C3Uninstalled dependency: &C3${dep.name}`);
@@ -101,37 +105,34 @@ export class DepFlowCLI extends Utilities.DebugUI {
         this.out.info(`&C(255,180,220)╭──────────────────────────────────────────────────`);
         try {
             const config = await Config.load(this.configPath);
-            const execPath = process.cwd();
             const watch = args.includes('--watch') || args.includes('-w');
-            
-            const projectPath = (
-                Utils.getFlagValue(args, '-p', false)[0] ||
-                Utils.getFlagValue(args, '--project', false)[0] ||
-                config.tsconfig || config.webTsconfig ||
-                Utilities.Path.join(execPath, 'tsconfig.json')
-            );
-            const tsconfig = await Tsconfig.load(projectPath);
-            const options = tsconfig.compilerOptions;
+            const useCDN = args.includes('--cdn');
 
-            if (!options) throw new Error('tsconfig.json must have "compilerOptions" to rewrite paths.');
-            if (!options.paths) throw new Error('tsconfig.json must have "paths" in compilerOptions to rewrite paths.');
-            if (!options.outDir) throw new Error('tsconfig.json must have an "outDir" specified in compilerOptions to rewrite paths.');
+            this.out.info(`&C(255,180,220)│ Mode: &C3${useCDN ? 'CDN' : 'Local'}`);
+            if (watch) this.out.info(`&C(255,180,220)│ Watcher: &C2Enabled`);
 
-            if (!options.baseUrl && !options.rootDir) {
-                this.out.warn(`&C(255,180,220)│ &C3Warning: Neither "baseUrl" nor "rootDir" found. Resolving paths relative to project root.`);
-            }
+            const resolver = new pathResolver(config, { mode: useCDN ? 'cdn' : 'local' });
 
-            const fixer = new PathFixer({
-                paths: options.paths,
-                baseUrl: options.baseUrl,
-                rootDir: options.rootDir,
-                outDir: options.outDir
-            });
-
-            if (watch) await fixer.watch();
-            else await fixer.run();
-
+            if (watch) await resolver.watch();
+            else await resolver.rewritePaths();
         } catch (error: any) { this.out.error(`&C(255,180,220)│ &C1${error.message || error}`); }
+        finally { this.out.info(`&C(255,180,220)╰──────────────────────────────────────────────────`); }
+    }
+    public async commandSync(command: string, args: string[]) {
+        this.out.info(`&C(255,180,220)╭──────────────────────────────────────────────────`);
+        this.out.info(`&C(255,180,220)│ Synchronizing configurations...`);
+        try {
+            const useCDN = args.includes('--cdn');
+
+            const config = await Config.load(this.configPath);
+            const resolver = new pathResolver(config, {
+                mode: useCDN ? 'cdn' : 'local',
+                logger: this.out
+            });
+            await resolver.syncTsConfig();
+            await resolver.syncImportMap();
+            this.out.info(`&C(255,180,220)│ &C2Successfully synced all configurations.`);
+        } catch (error: any) { this.out.error(`&C(255,180,220)│ &C1Error during sync: ${error.message}`); }
         finally { this.out.info(`&C(255,180,220)╰──────────────────────────────────────────────────`); }
     }
 }

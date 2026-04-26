@@ -1,0 +1,299 @@
+/**
+ * @author NetFeez <netfeez.dev@gmail.com>
+ * @description Dependency utility.
+ * @license Apache-2.0
+ */
+import { promises as FS } from "fs";
+import { ChildProcess, ChildProcessWithoutNullStreams, spawn } from "child_process";
+
+import Git from "./Git.js";
+import File from "./File.js";
+import schemas from "../config/schemas.js";
+import Validator from "./Validator.js";
+import Config from "../config/Config.js";
+import { Utilities } from "vortez";
+
+export class Dependency implements Dependency.Dependency {
+    public static include: string[] = [ '*' ];
+    public readonly name: string;
+    public readonly repo: Dependency.repo;
+    public readonly branch?: string;
+    public readonly builder: Dependency.Builder[];
+    public readonly resolver: Dependency.Resolver[];
+
+    public constructor(
+        protected readonly config: Config.Config,
+        dependency: Dependency.Dependency
+    ) {
+        Validator.validateRepo(dependency.repo);
+        this.name = dependency.name;
+        this.repo = dependency.repo;
+        this.branch = dependency.branch;
+        this.builder = dependency.builder;
+        this.resolver = dependency.resolver;
+    }
+    /** Get the folder of the dependency */
+    public get folder(): string {
+        let path = Utilities.Path.join(this.config.flowFolder, this.name);
+        path = Utilities.Path.normalize(path);
+        return path;
+    }
+    /**
+     * Clones the dependency's repository to the local file system. If the target folder already exists, it checks the 'force' option: if 'force' is false, it performs a pull to update the existing repository; if 'force' is true, it uninstalls (deletes) the existing folder before cloning.
+     * This method ensures that the local copy of the dependency is up-to-date with the remote repository, allowing for both fresh installations and updates based on user preference.
+     * @param options An object containing options for managing the dependency, such as 'force' to determine whether to overwrite existing files.
+     * @returns A promise that resolves to a string message indicating the result of the clone or pull operation.
+     * @throws Will throw an error if the cloning or pulling process fails.
+     */
+    public async clone(options: Dependency.manageOptions = {}): Promise<string> {
+        if (await File.exists(this.folder)) {
+            if (!options.force) return await this.pull();
+            else await this.uninstall();
+        }
+        return await Git.clone(this.repo, this.folder, this.branch);
+    }
+    /**
+     * Pulls the latest changes from the dependency's repository to the local file system. It uses the Git utility to perform a pull operation on the existing local repository, ensuring that it is updated with any new commits or changes from the remote repository. This method is essential for keeping the local copy of the dependency in sync with its source, allowing for seamless updates without needing to reinstall the entire dependency.
+     * @returns A promise that resolves to a string message indicating the result of the pull operation.
+     * @throws Will throw an error if the pull process fails, such as if the local repository is not properly set up or if there are conflicts that cannot be automatically resolved.
+     */
+    public async pull(): Promise<string> {
+        return await Git.pull(this.folder, this.branch);
+    }
+    /**
+     * Installs the dependency by first cloning its repository (or pulling updates if it already exists) and then executing any build steps defined in the builder property. It manages the entire installation process, including handling the cloning/pulling of the repository and running any necessary commands to set up the dependency according to its configuration. This method ensures that the dependency is properly installed and ready for use, providing feedback on each step of the process through returned messages.
+     * @returns A promise that resolves to an array of string messages indicating the results of the cloning/pulling and building processes.
+     * @throws Will throw an error if any step of the installation process fails, such as issues with cloning, pulling, or executing build commands.
+     */
+    public async install(): Promise<string[]> {
+        const output: string[] = [];
+        try {
+            const cloneResult = await this.clone();
+            output.push(cloneResult);
+            const buildResult = await this.build();
+            output.push(...buildResult);
+            return output;
+        } catch (error) { throw error; }
+    }
+    /**
+     * Uninstalls the dependency by removing its local folder and any additional folders specified in the builder's move steps.
+     * It checks for the existence of each folder before attempting to remove it, ensuring that it only tries to delete valid paths.
+     * This method is crucial for cleanly removing a dependency from the local file system, allowing for a complete uninstallation that includes all related files and directories as defined by the dependency's configuration.
+     * @return A promise that resolves to an array of string messages indicating the results of the uninstallation process, such as which folders were removed.
+     * @throws Will throw an error if any issues occur during the uninstallation process, such as problems with file system access or if the specified folders cannot be removed.
+     */
+    public async uninstall(): Promise<string[]> {
+        try {
+            const output: string[] = [];
+
+            const moves: string[] = this.builder
+                ? this.builder
+                    .map(step => step.move ? Dependency.getAllOutFolders(step.move) : [])
+                    .reduce((acc, val) => acc.concat(val), [])
+                : [];
+
+            const folders: string[] = [ this.folder, ...moves ];
+
+            for (const folder of folders) {
+                if (!await File.exists(folder)) continue;
+                output.push(`Removing &C4${folder}`);
+                await FS.rm(folder, { recursive: true });
+            }
+            return output;
+        } catch (error) { throw error; }
+    }
+    /**
+     * Builds the dependency by executing the commands specified in the builder property.
+     * It iterates through each build step, running any defined commands and handling file movements as necessary.
+     * The method uses a child process to execute shell commands, capturing the output and errors for each step.
+     * This allows for a flexible build process that can accommodate various setup requirements defined by the dependency's configuration, ensuring that the dependency is properly built and ready for use after installation.
+     * @return A promise that resolves to an array of string messages indicating the results of the build process, including any command outputs and file movements.
+     * @throws Will throw an error if any issues occur during the build process, such as command execution failures or problems with file movements.
+     */
+    protected async build(): Promise<string[]> {
+        const output: string[] = [];
+        if (!this.builder || this.builder.length === 0) return output;
+
+        const shell = spawn('/bin/bash', [], {
+            stdio: ['pipe', 'pipe', 'pipe']
+        });
+        try { for (const step of this.builder) {
+            if (step.run) {
+                const run = typeof step.run === 'string' ? [ step.run ] : step.run;
+                const commands = [ `cd ${this.folder}`, ...run ];
+                const results = await this.executeCommands(commands, shell);
+                output.push(...results);
+            }
+            if (step.move) {
+                const moveResults = await this.move(step.move);
+                output.push(...moveResults);
+            }
+        } } catch (error) { throw error; }
+        finally { shell.kill(); }
+        return output;
+    }
+    /**
+     * Handles the file movements defined in the builder's move steps.
+     * It supports various formats for specifying destinations, including strings, arrays, and objects with keys representing source paths.
+     * The method checks for the existence of source files or directories before attempting to move them to the specified destinations, ensuring that it only operates on valid paths.
+     * This function is essential for managing the organization of files after building a dependency, allowing for flexible configurations that can accommodate different project structures and requirements.
+     * @param move The move configuration from the builder, which can be a string, an array of strings, or an object mapping source paths to destination paths.
+     * @returns A promise that resolves to an array of string messages indicating the results of the file movements, including any errors encountered during the process.
+     * @throws Will throw an error if any issues occur during the file movement process, such as missing source paths or problems with file system access.
+     */
+    protected async move(move: Dependency.Builder['move']): Promise<string[]> {
+        if (!move) return [];
+        const output: string[] = [];
+        if (typeof move === 'string' || Array.isArray(move)) {
+            const moves = Array.isArray(move) ? move : [ move ];
+            for (const destination of moves) {
+                const moveResult = await this.moveFiles(destination);
+                output.push(...moveResult);
+            }
+        } else {
+            for (const key in move) {
+                const value = move[key];
+                const destinations = typeof value === 'string' ? [ value ] : value;
+                for (const destination of destinations) {
+                    const moveResult = await this.moveFiles(destination, key);
+                    output.push(...moveResult);
+                }
+            }
+        }
+        return output;
+    }
+    /**
+     * Executes a series of shell commands in a child process, capturing the output and errors for each command.
+     * It writes each command to the child process's stdin and listens for output on stdout and stderr.
+     * The method uses a marker to determine when a command has finished executing, allowing it to capture the complete output for each command before proceeding to the next one.
+     * This function is crucial for running build commands defined in the dependency's configuration, providing feedback on the execution of each command and handling any errors that may arise during the process.
+     * @param commands An array of shell commands to execute.
+     * @param shell The child process in which to execute the commands.
+     * @returns A promise that resolves to an array of string messages indicating the results of the command executions, including any output or errors captured during the process.
+     * @throws Will throw an error if any command fails to execute properly, providing details about the failed command and the associated error message.
+     */
+    protected async executeCommands(commands: string[], shell: ChildProcessWithoutNullStreams): Promise<string[]> {
+        const output: string[] = [];
+
+        shell.stderr.on('data', data => output.push(data.toString()));
+        for (const command of commands) {
+            const result = await this.executeCommand(shell, command);
+            output.push(...result);
+        }
+        shell.kill();
+        return output;
+    }
+    /**
+     * Executes a single shell command in the provided child process, capturing its output and handling errors.
+     * It writes the command to the child process's stdin and listens for output on stdout and stderr.
+     * The method uses a unique marker to determine when the command has finished executing, allowing it to capture the complete output before resolving.
+     * If an error occurs during execution, it captures the error message and rejects the promise with a descriptive error.
+     * This function is essential for running individual build commands as part of the dependency installation process, providing detailed feedback on the execution of each command and ensuring that any issues are properly handled and reported.
+     * @param shell The child process in which to execute the command.
+     * @param command The shell command to execute.
+     * @returns A promise that resolves to an array of string messages indicating the result of the command execution, including any output captured during the process.
+     * @throws Will throw an error if the command fails to execute properly, providing details about the failed command and the associated error message.
+     */
+    protected async executeCommand(shell: ChildProcessWithoutNullStreams, command: string): Promise<string[]> {
+        const output: string[] = [];
+        output.push(`&RRunning command &C4${command}`);
+        await new Promise<void>((resolve, reject) => {
+            shell.stdin.write(command + '\n');
+
+            const marker = `__END_${Date.now()}__`;
+            shell.stdin.write(`echo ${marker}\n`);
+
+            let out: string = '';
+
+            const listener = (data: Buffer) => {
+                if (data.toString().includes(marker)) {
+                    shell.stdout.off('data', listener);
+                    output.push(out.trim());
+                    resolve();
+                } else out += data.toString().trim()
+            };
+            shell.stdout.on('data', listener);
+            shell.stderr.once('data', data => {
+                shell.stdout.off('data', listener);
+                output.push(data.toString().trim());
+                reject(new Error(`Command "${command}" failed with error: ${data.toString().trim()}`));
+            });
+        });
+        return output;
+    }
+    /**
+     * Handles the file movements for a specific source and destination.
+     * It checks for the existence of the source path and creates the destination folder if it does not exist.
+     * The method uses fs.cp to copy files or directories from the source to the destination, supporting recursive copying for directories.
+     * It captures any errors that occur during the process and provides descriptive error messages to help identify issues with file movements.
+     * This function is crucial for managing the organization of files after building a dependency, allowing for flexible configurations that can accommodate different project structures and requirements.
+     * @param destination The target path(s) where the source should be moved to.
+     * @param source An optional specific source path within the dependency folder to move, defaulting to the entire folder if not provided.
+     * @returns A promise that resolves to an array of string messages indicating the results of the file movements, including any errors encountered during the process.
+     * @throws Will throw an error if any issues occur during the file movement process, such as missing source paths or problems with file system access.
+     */
+    protected async moveFiles(destination: string | string[], source?: string): Promise<string[]> {
+        const output: string[] = [];
+        destination = Array.isArray(destination) ? destination : [ destination ];
+        source = Dependency.getSourcePath(this.folder, source);
+        for (const folder of destination) {
+            try {
+                if (!await File.exists(source)) throw new Error(`Source path ${source} does not exist.`);
+                if (!await File.exists(folder)) {
+                    if (!await File.isFile(source)) await FS.mkdir(folder, { recursive: true });
+                    else {
+                        const toCreate = folder.slice(0, folder.lastIndexOf('/'));
+                        if (!await File.exists(toCreate)) await FS.mkdir(toCreate, { recursive: true });
+                    }
+                }
+                output.push(`&RMoving source &C4${source} &Rto &C4${folder}`);
+                await FS.cp(source, folder, { recursive: true, force: true });
+            } catch (error) { throw new Error(`Failed to move files from ${this.name} to ${folder}, \n${error}`); }
+        }
+        return output;
+    }
+    /**
+     * Constructs the source path for file movements based on the dependency's folder and an optional specific source path.
+     * If a specific source is provided, it concatenates it with the dependency's folder; otherwise, it returns the dependency's folder as the source path.
+     * The method also ensures that any trailing slashes are removed from the folder and that any leading slashes are removed from the source to create a valid path for file operations.
+     * This function is essential for determining the correct source path when moving files as part of the build process, allowing for flexible configurations that can specify either the entire dependency folder or specific subpaths within it.
+     * @param folder The base folder of the dependency.
+     * @param source An optional specific source path within the dependency folder to use for file movements.
+     * @returns A string representing the constructed source path for file operations.
+     */
+    public static getSourcePath(folder: string, source?: string): string {
+        folder = folder.endsWith('/') ? folder.slice(0, -1) : folder;
+        if (!source) return folder;
+        source = source.startsWith('/') ? source.slice(1) : source;
+        return `${folder}/${source}`.replace(/ /g, '\\ ');
+    }
+    /**
+     * Recursively extracts all destination folders from the builder's move configuration, supporting various formats such as strings, arrays, and nested objects.
+     * It traverses the move configuration, collecting all destination paths into a single array, which can then be used for file operations during the build process.
+     * This method is crucial for managing the organization of files after building a dependency, allowing for flexible configurations that can accommodate different project structures and requirements.
+     * @param builder The move configuration from the builder, which can be a string, an array of strings, or an object mapping source paths to destination paths.
+     * @returns An array of strings representing all destination folders extracted from the move configuration.
+     */
+    public static getAllOutFolders(builder: Dependency.Builder['move']): string[] {
+        if (!builder) return [];
+        const folders: string[] = [];
+        if (typeof builder === 'string') folders.push(builder);
+        else if (Array.isArray(builder)) folders.push(...builder);
+        else for (const key in builder) {
+            const out = this.getAllOutFolders(builder[key]);
+            folders.push(...out);
+        } return folders;
+    }
+}
+
+export namespace Dependency {
+    export type logCallback = (messages: string[]) => void;
+    export type repo = `https://github.com/${string}/${string}.git` | `git@github.com:${string}/${string}.git`;
+    export type Builder = schemas.builder['infer'];
+    export type Resolver = schemas.pathResolverEntry['infer'];
+    export type Dependency = schemas.dependency['infer'];
+    export type newDependency = schemas.dependency['inferToProcess'];
+    export interface manageOptions { force?: boolean; }
+}
+
+export default Dependency;

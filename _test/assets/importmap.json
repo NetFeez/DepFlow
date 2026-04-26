@@ -1,0 +1,8 @@
+{
+    "imports": {
+        "vizui": "https://netfeez.github.io/vizui/v1.0.0/vizui.js",
+        "vizui/": "https://netfeez.github.io/vizui/v1.0.0/",
+        "vortez": "https://vortez.netfeez.dev/cdn/v1.0.0/vortez.js",
+        "vortez/": "https://vortez.netfeez.dev/cdn/v1.0.0/"
+    }
+}

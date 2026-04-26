@@ -1,14 +1,31 @@
 #!/usr/bin/env node
 
+import { publicDecrypt } from "node:crypto";
 import DepFlowCLI from "./DepFLowCLI.js";
+import { Utils } from "../support/Utils.js";
+import schemas from "../config/schemas.js";
+import { json } from "node:stream/consumers";
 
-const cli = new DepFlowCLI();
+function startupSchemaValidation(flowPath: string) {
+    const jsonSchema = schemas.config.jsonSchema;
+    Utils.addVscodeValidation(flowPath, jsonSchema);
+}
 
+const skip = 2;
+const [commandName, ...args] = process.argv.slice(skip);
+
+const flowTag = (
+    Utils.getFlagValue(args, '--flow') ||
+    Utils.getFlagValue(args, '-f')
+);
+
+const flowPath = flowTag[0] || 'depflow.json';
+const cli = new DepFlowCLI(flowPath);
+
+startupSchemaValidation(flowPath);
+console.log(flowPath);
 try {
-    const skip = 2;
-    const [commandName, ...args] = process.argv.slice(skip);
-
-    if (commandName) {
+    if (commandName !== null) {
         const command = cli.getCommand(commandName);
         if (command) {
             await command.exec.call(cli, commandName, args);
