@@ -38,6 +38,11 @@ export class PathResolver {
         this.aliases = new AliasCompiler(PathResolver.PROJECT_ROOT).compile(config);
         this.rewriter = new PathRewriter(this.aliases, PathResolver.PROJECT_ROOT);
     }
+    /**
+     * Resolves and rewrites paths in built files based on the provided mode (local or CDN).
+     * It processes all files in the output directory, rewriting import paths according to the configured aliases.
+     * @param mode The resolution mode ('local' or 'cdn') to determine which target paths to use.
+     */
     public async rewritePaths(mode: PathResolver.Mode): Promise<void> {
         this.logger.log(`&C2Starting path resolver in &C3${mode} &C2mode...`);
         
@@ -51,6 +56,13 @@ export class PathResolver {
         }
         this.logger.log(`&C2Path aliases resolved in &C3${rewrittenCount} &C2files.`);
     }
+    /**
+     * Processes a single file, rewriting import paths based on the configured aliases and the specified mode (local or CDN).
+     * It reads the file content, applies the path rewriting logic, and writes the updated content back to the file system if any changes were made.
+     * @param file The path of the file to process.
+     * @param mode The resolution mode ('local' or 'cdn') to determine which target paths to use for rewriting.
+     * @returns A boolean indicating whether the file was modified (true if rewritten, false if no changes were made).
+     */
     protected async processFile(file: string, mode: PathResolver.Mode): Promise<boolean> {
         try {
             const content = await fs.readFile(file, 'utf8');
@@ -65,6 +77,14 @@ export class PathResolver {
             return false;
         }
     }
+    /**
+     * Watches the output directory for changes and automatically rewrites paths in modified files based on the configured aliases and specified mode (local or CDN).
+     * It sets up a file system watcher that listens for changes in the output directory, and when a relevant file is modified, it triggers the path rewriting process for that file.
+     * The method includes debouncing to prevent excessive processing during rapid file changes, ensuring efficient handling of updates while maintaining responsiveness.
+     * @param mode The resolution mode ('local' or 'cdn') to determine which target paths to use for rewriting when changes are detected.
+     * @returns A promise that resolves when the watcher is set up and running, allowing the application to continue monitoring for changes indefinitely until manually stopped.
+     * @throws Will throw an error if there is an issue setting up the file system watcher or processing files, which can be caught by the caller to handle it appropriately.
+     */
     public async watch(mode: PathResolver.Mode): Promise<void> {
         await this.rewritePaths(mode);
         this.logger.log(`&C2Watching for changes in &C4${this.absoluteOutDir}...`);

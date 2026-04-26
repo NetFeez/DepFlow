@@ -4,7 +4,7 @@ import { Logger, Utilities } from 'vortez';
 
 import File from "../support/File.js";
 import schemas from "./schemas.js";
-import AliasCompiler from '../support/Resolver/AliasCompiler.js';
+import AliasCompiler from '../support/PathResolver/AliasCompiler.js';
 
 export class Tsconfig {
     protected logger: Logger;

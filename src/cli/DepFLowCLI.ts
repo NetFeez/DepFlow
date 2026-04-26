@@ -6,7 +6,7 @@ import Config from "../config/Config.js";
 import schemas from "../config/schemas.js";
 import Dependency from "../support/Dependency.js";
 import Tsconfig from "../config/Tsconfig.js";
-import pathResolver, { PathResolver } from "../support/Resolver/PathResolver.js";
+import pathResolver, { PathResolver } from "../support/PathResolver/PathResolver.js";
 import ImportMap from "../config/ImportMap.js";
 import path from "node:path";
 

@@ -2,7 +2,7 @@ import path from 'node:path';
 import { Logger, Utilities } from 'vortez';
 
 import File from "../support/File.js";
-import AliasCompiler from '../support/Resolver/AliasCompiler.js';
+import AliasCompiler from '../support/PathResolver/AliasCompiler.js';
 import { isWritable } from 'node:stream';
 
 export class ImportMap {

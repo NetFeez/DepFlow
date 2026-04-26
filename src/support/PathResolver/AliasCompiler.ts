@@ -5,7 +5,13 @@ import Utils from './Utils.js';
 
 export class AliasCompiler {
     constructor(private projectRoot: string) {}
-
+    /**
+     * Compiles alias configurations from the provided config object into a structured format for path resolution.
+     * It processes both regular and wildcard aliases, resolving local paths to absolute paths based on the project root.
+     * The resulting compiled aliases include information about the alias name, whether it's a wildcard, and its target paths for local and CDN usage.
+     * @param config The configuration object containing dependencies with resolver entries to compile into aliases.
+     * @returns An array of compiled alias objects ready for use in path resolution.
+     */
     public compile(config: schemas.config['infer']): AliasCompiler.CompiledAlias[] {
         const result: AliasCompiler.CompiledAlias[] = [];
         const allDeps = [...(config.dependencies || []), ...(config.npmDependencies || [])];

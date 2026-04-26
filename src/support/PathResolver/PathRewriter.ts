@@ -8,7 +8,14 @@ export class PathRewriter {
         private readonly aliases: AliasCompiler.CompiledAlias[],
         private readonly projectRoot: string
     ) {}
-
+    /**
+     * Rewrites import paths in the given content based on the configured aliases.
+     * It detects import statements and replaces alias paths with their resolved targets.
+     * @param content The file content to rewrite.
+     * @param filePath The path of the file being processed (used for relative path calculations).
+     * @param mode The resolution mode ('local' or 'cdn') to determine which target to use.
+     * @returns The rewritten content with resolved import paths.
+     */
     public rewrite(content: string, filePath: string, mode: 'local' | 'cdn'): string {
         return content.replace(PathRewriter.IMPORT_REGEX, (match, prefix, modulePath, suffix) => {
             const aliasCfg = this.aliases.find(c => c.isWildcard ? modulePath.startsWith(`${c.alias}/`) : modulePath === c.alias);
