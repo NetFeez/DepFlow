@@ -33,7 +33,7 @@
     "README.md"
   ],
   "dependencies": {
-    "@netfeez/common": "^2.1.0",
+    "@netfeez/common": "^3.0.0",
     "@netfeez/common-node": "^1.0.1",
     "@netfeez/vterm": "^1.0.0"
   },

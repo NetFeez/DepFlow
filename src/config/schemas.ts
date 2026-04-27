@@ -1,20 +1,27 @@
 import { Schema } from '@netfeez/common';
 
-export const basicTsconfig = new Schema({
+export const basicImportmap = Schema.fromObject({
+    imports: { type: 'object' },
+    scopes: { type: 'object' }
+});
+
+export const basicTsconfig = Schema.fromObject({
     compilerOptions: { type: 'object', properties: {
         baseUrl: { type: 'string' },
         rootDir: { type: 'string' },
         outDir: { type: 'string' },
         paths: { type: 'object' }
-    } }
-});
+    }, allowAdditionalProperties: true },
+}, true);
 
-export const builder = new Schema({
+let test = basicTsconfig.infer
+
+export const builder = Schema.fromObject({
     run: {  union: [ { type: 'string' },  { type: 'array', items: { type: 'string' } } ]  },
     move: {  union: [ { type: 'string' },  { type: 'object' } ]  }
 });
 
-export const pathResolverEntry = new Schema({
+export const pathResolverEntry = Schema.fromObject({
     alias: { type: 'string', required: true },
     target: { union: [
         { type: 'string' },
@@ -25,30 +32,26 @@ export const pathResolverEntry = new Schema({
     ], required: true }
 });
 
-export const dependency = new Schema({
+export const dependency = Schema.fromObject({
     name: { type: 'string', required: true },
     repo: { type: 'string', required: true },
     branch: { type: 'string' },
-    builder: { type: 'array', default: [], items: { type: 'object', properties: builder.schema } },
-    resolver: { type: 'array', nullable: true, default: [], items: {
-        type: 'object', properties: pathResolverEntry.schema}
-    }
+    builder: { type: 'array', default: [], items: builder.root },
+    resolver: { type: 'array', nullable: true, default: [], items: pathResolverEntry.root }
 });
 
-export const npmDependencySchema = new Schema({
+export const npmDependencySchema = Schema.fromObject({
     name: { type: 'string', required: true },
-    resolver: { type: 'array', nullable: true, default: [], items: {
-        type: 'object', properties: pathResolverEntry.schema}
-    }
+    resolver: { type: 'array', nullable: true, default: [], items: pathResolverEntry.root }
 });
 
-export const config = new Schema({
+export const config = Schema.fromObject({
     flowFolder: { type: 'string', default: '.depflow' },
     outDir: { type: 'string', default: '.' },
     tsconfig: { type: 'string', nullable: true, default: null },
     importmap: { type: 'string', nullable: true, default: null },
-    dependencies: {  type: 'array',  default: [],  items: { type: 'object', properties: dependency.schema }  },
-    npmDependencies: { type: 'array', default: [], items: { type: 'object', properties: npmDependencySchema.schema } }
+    dependencies: {  type: 'array',  default: [],  items: dependency.root },
+    npmDependencies: { type: 'array', default: [], items: npmDependencySchema.root }
 });
 
 export const schemas = { basicTsconfig, config, builder, pathResolver: pathResolverEntry, dependency };

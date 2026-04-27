@@ -30,7 +30,7 @@ export class Dependency implements Dependency.Dependency {
         this.repo = dependency.repo;
         this.branch = dependency.branch;
         this.builder = dependency.builder;
-        this.resolver = dependency.resolver;
+        this.resolver = dependency.resolver || [];
     }
     /** Get the folder of the dependency */
     public get folder(): string {
