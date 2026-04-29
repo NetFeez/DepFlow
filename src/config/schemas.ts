@@ -17,6 +17,7 @@ export const basicTsconfig = Schema.fromObject({
 let test = basicTsconfig.infer
 
 export const builder = Schema.fromObject({
+    maxTimeMs: { type: 'number', default: 60000 },
     run: {  union: [ { type: 'string' },  { type: 'array', items: { type: 'string' } } ]  },
     move: {  union: [ { type: 'string' },  { type: 'object' } ]  }
 });
@@ -35,7 +36,7 @@ export const pathResolverEntry = Schema.fromObject({
 export const dependency = Schema.fromObject({
     name: { type: 'string', required: true },
     repo: { type: 'string', required: true },
-    branch: { type: 'string' },
+    tag: { type: 'string' },
     builder: { type: 'array', default: [], items: builder.root },
     resolver: { type: 'array', nullable: true, default: [], items: pathResolverEntry.root }
 });
