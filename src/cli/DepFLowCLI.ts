@@ -1,4 +1,4 @@
-import { DebugUI } from "@netfeez/vterm";
+import Logger, { DebugUI } from "@netfeez/vterm";
 
 import Validator from "../support/Validator.js";
 import Utils from "../support/Utils.js";
@@ -57,15 +57,12 @@ export class DepFlowCLI extends DebugUI {
         this.out.info(`&C(255,180,220)╭──────────────────────────────────────────────────`);
         try {
             const config = await Config.load(this.configPath);
-            const toInstall = args.length > 0
-                ? config.dependencies.filter(dep => args.includes(dep.name) || args.includes(dep.repo))
-                : config.dependencies;
-            if (toInstall.length === 0) throw new Error(args.length > 0 ? 'Specified dependencies not found.' : 'No dependencies to install.');
-            for (const dep of toInstall) {
+            const dependencies = config.dependencies;
+            if (dependencies.length === 0) throw new Error(args.length > 0 ? 'Specified dependencies not found.' : 'No dependencies to install.');
+            for (const dep of dependencies) {
                 this.out.info(`&C(255,180,220)│ Installing "${dep.name}" from "${dep.repo}"...`);
-                const dependency = new Dependency(config, dep);
-                const result = await dependency.install();
-                this.out.info(`&C(255,180,220)│ ${result.join('\n').replace(/\n/g, '\n&C(255,180,220)│ ')}`);
+                const dependency = new Dependency(config, dep, this.out);
+                await dependency.install();
                 this.out.info(`&C(255,180,220)│ &C3Installed dependency: &C3${dep.name}`);
                 this.out.info(`&C(255,180,220)│ Installed "${dep.name}".`);
             }
@@ -77,15 +74,12 @@ export class DepFlowCLI extends DebugUI {
         this.out.info(`&C(255,180,220)╭──────────────────────────────────────────────────`);
         try {
             const config = await Config.load(this.configPath);
-            const toUninstall = args.length > 0
-                ? config.dependencies.filter(dep => args.includes(dep.name) || args.includes(dep.repo))
-                : config.dependencies;
-            if (toUninstall.length === 0) throw new Error(args.length > 0 ? 'Specified dependencies not found.' : 'No dependencies to uninstall.');
-            for (const dep of toUninstall) {
+            const dependencies = config.dependencies;
+            if (dependencies.length === 0) throw new Error(args.length > 0 ? 'Specified dependencies not found.' : 'No dependencies to uninstall.');
+            for (const dep of dependencies) {
                 this.out.info(`&C(255,180,220)│ Uninstalling "${dep.name}" from "${dep.repo}"...`);
-                const dependency = new Dependency(config, dep);
-                const result = await dependency.uninstall();
-                this.out.info(`&C(255,180,220)│ ${result.join('\n').replace(/\n/g, '\n&C(255,180,220)│ ')}`);
+                const dependency = new Dependency(config, dep, this.out);
+                await dependency.uninstall();
                 this.out.info(`&C(255,180,220)│ &C3Uninstalled dependency: &C3${dep.name}`);
                 this.out.info(`&C(255,180,220)│ Uninstalled "${dep.name}".`);
             }
