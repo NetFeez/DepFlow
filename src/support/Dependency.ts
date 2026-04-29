@@ -7,28 +7,32 @@ import { promises as FS } from "fs";
 import { ChildProcessWithoutNullStreams, spawn } from "child_process";
 
 import { File, Path } from '@netfeez/common-node';
+import Logger from "@netfeez/vterm";
 
 import schemas from "../config/schemas.js";
-import Git from "./Git.js";
 import Validator from "./Validator.js";
 import Config from "../config/Config.js";
+import Git from "./Git.js";
+import Async from "./Async.js";
+import Task from "./Task/Task.js";
 
 export class Dependency implements Dependency.Dependency {
     public static include: string[] = [ '*' ];
     public readonly name: string;
     public readonly repo: Dependency.repo;
-    public readonly branch?: string;
+    public readonly tag?: string;
     public readonly builder: Dependency.Builder[];
     public readonly resolver: Dependency.Resolver[];
 
     public constructor(
         protected readonly config: Config.Config,
-        dependency: Dependency.Dependency
+        dependency: Dependency.Dependency,
+        protected logger: Logger
     ) {
         Validator.validateRepo(dependency.repo);
         this.name = dependency.name;
         this.repo = dependency.repo;
-        this.branch = dependency.branch;
+        this.tag = dependency.tag;
         this.builder = dependency.builder;
         this.resolver = dependency.resolver || [];
     }
@@ -39,40 +43,30 @@ export class Dependency implements Dependency.Dependency {
         return path;
     }
     /**
-     * Clones the dependency's repository to the local file system. If the target folder already exists, it checks the 'force' option: if 'force' is false, it performs a pull to update the existing repository; if 'force' is true, it uninstalls (deletes) the existing folder before cloning.
-     * This method ensures that the local copy of the dependency is up-to-date with the remote repository, allowing for both fresh installations and updates based on user preference.
-     * @param options An object containing options for managing the dependency, such as 'force' to determine whether to overwrite existing files.
-     * @returns A promise that resolves to a string message indicating the result of the clone or pull operation.
-     * @throws Will throw an error if the cloning or pulling process fails.
+     * Updates the local repository of the dependency by either cloning it if it does not exist or pulling the latest changes if it already exists. It checks for the existence of the dependency's folder and performs the appropriate Git operations, providing logging throughout the process to indicate the status of the operations. This method ensures that the local copy of the dependency is up-to-date with its remote repository, allowing for a smooth installation and build process when managing dependencies in a project.
+     * @returns A promise that resolves when the update process is complete, or rejects with an error if any step of the process fails, allowing callers to handle such scenarios appropriately.
+     * @throws Will throw an error if any issues occur during the cloning or pulling process, such as problems with Git commands or file system access.
      */
-    public async clone(options: Dependency.manageOptions = {}): Promise<string> {
+    protected async update(): Promise<void> {
         if (await File.exists(this.folder)) {
-            if (!options.force) return await this.pull();
-            else await this.uninstall();
+            this.logger.log(`&R[${this.name}] &GRepository already exists, pulling latest changes...`);
+            await Git.pull(this.folder, { logger: this.logger });
+            this.logger.log(`&R[${this.name}] &GPull completed successfully.`);
+        } else {
+            this.logger.log(`&R[${this.name}] &GCloning repository from ${this.repo}...`);
+            await Git.clone(this.repo, this.folder, { tag: this.tag, logger: this.logger });
+            this.logger.log(`&R[${this.name}] &GClone completed successfully.`);
         }
-        return await Git.clone(this.repo, this.folder, this.branch);
-    }
-    /**
-     * Pulls the latest changes from the dependency's repository to the local file system. It uses the Git utility to perform a pull operation on the existing local repository, ensuring that it is updated with any new commits or changes from the remote repository. This method is essential for keeping the local copy of the dependency in sync with its source, allowing for seamless updates without needing to reinstall the entire dependency.
-     * @returns A promise that resolves to a string message indicating the result of the pull operation.
-     * @throws Will throw an error if the pull process fails, such as if the local repository is not properly set up or if there are conflicts that cannot be automatically resolved.
-     */
-    public async pull(): Promise<string> {
-        return await Git.pull(this.folder, this.branch);
     }
     /**
      * Installs the dependency by first cloning its repository (or pulling updates if it already exists) and then executing any build steps defined in the builder property. It manages the entire installation process, including handling the cloning/pulling of the repository and running any necessary commands to set up the dependency according to its configuration. This method ensures that the dependency is properly installed and ready for use, providing feedback on each step of the process through returned messages.
      * @returns A promise that resolves to an array of string messages indicating the results of the cloning/pulling and building processes.
      * @throws Will throw an error if any step of the installation process fails, such as issues with cloning, pulling, or executing build commands.
      */
-    public async install(): Promise<string[]> {
-        const output: string[] = [];
+    public async install(): Promise<void> {
         try {
-            const cloneResult = await this.clone();
-            output.push(cloneResult);
-            const buildResult = await this.build();
-            output.push(...buildResult);
-            return output;
+            await this.update();
+            await this.build();
         } catch (error) { throw error; }
     }
     /**
@@ -82,10 +76,8 @@ export class Dependency implements Dependency.Dependency {
      * @return A promise that resolves to an array of string messages indicating the results of the uninstallation process, such as which folders were removed.
      * @throws Will throw an error if any issues occur during the uninstallation process, such as problems with file system access or if the specified folders cannot be removed.
      */
-    public async uninstall(): Promise<string[]> {
+    public async uninstall(): Promise<void> {
         try {
-            const output: string[] = [];
-
             const moves: string[] = this.builder
                 ? this.builder
                     .map(step => step.move ? Dependency.getAllOutFolders(step.move) : [])
@@ -96,10 +88,9 @@ export class Dependency implements Dependency.Dependency {
 
             for (const folder of folders) {
                 if (!await File.exists(folder)) continue;
-                output.push(`Removing &C4${folder}`);
+                if (this.logger) this.logger.log(`&R[${this.name}] &GRemoving folder: &C4${folder}`);
                 await FS.rm(folder, { recursive: true });
             }
-            return output;
         } catch (error) { throw error; }
     }
     /**
@@ -110,27 +101,43 @@ export class Dependency implements Dependency.Dependency {
      * @return A promise that resolves to an array of string messages indicating the results of the build process, including any command outputs and file movements.
      * @throws Will throw an error if any issues occur during the build process, such as command execution failures or problems with file movements.
      */
-    protected async build(): Promise<string[]> {
-        const output: string[] = [];
-        if (!this.builder || this.builder.length === 0) return output;
+    protected async build(): Promise<boolean> {
+        if (!this.builder || this.builder.length === 0) return true;
 
-        const shell = spawn('/bin/bash', [], {
-            stdio: ['pipe', 'pipe', 'pipe']
-        });
-        try { for (const step of this.builder) {
+        for (const step of this.builder) {
             if (step.run) {
-                const run = typeof step.run === 'string' ? [ step.run ] : step.run;
-                const commands = [ `cd ${this.folder}`, ...run ];
-                const results = await this.executeCommands(commands, shell);
-                output.push(...results);
+                const commands = Array.isArray(step.run) ? step.run : [ step.run ];
+                await this.runTask(commands, {
+                    logger: this.logger,
+                    maxTimeMs: step.maxTimeMs
+                });
             }
-            if (step.move) {
-                const moveResults = await this.move(step.move);
-                output.push(...moveResults);
+            if (step.move) {await this.move(step.move);}
+        }
+        return true;
+    }
+    /**
+     * Runs a series of shell commands as part of the build process, using a child process to execute the commands and capturing the output for logging. It handles the execution of the commands, providing feedback on the progress and any errors that occur during the process. This method is essential for executing the necessary setup commands defined in the builder configuration, allowing for a flexible and dynamic build process that can accommodate various requirements for different dependencies.
+     * @param commands An array of strings representing the shell commands to be executed as part of the build process.
+     * @param logger An optional Logger instance for logging the output and errors from the command execution.
+     * @returns A promise that resolves when the command execution is complete, or rejects with an error if any command fails, allowing callers to handle such scenarios appropriately.
+     * @throws Will throw an error if any issues occur during the execution of the commands, such as problems with spawning the child process or if any command returns a non-zero exit code.
+     */
+    protected runTask(commands: string[], options: Dependency.taskOptions = {}): Promise<void> {
+        const { logger, maxTimeMs } = options;
+        return Async.awaitEvent<void>((done, fail) => {
+            const pollito = new Task(this.folder, commands);
+            if (logger) {
+                pollito.on('line', (line) => logger.info(`&R[${this.name} Build] &G${line}`));
+                pollito.on('error', (msg, step) => logger.error(`&R[${this.name} Build] &C1[Step ${step}] &C7: &C1${msg}`));
             }
-        } } catch (error) { throw error; }
-        finally { shell.kill(); }
-        return output;
+            pollito.once('finish', (data) => {
+                if (data.fails > 0) fail(new Error(`Build failed with ${data.fails} failed steps.`));
+                else done();
+            });
+            pollito.start().catch(fail);
+            return () => { pollito.stop(); };
+        }, maxTimeMs);
     }
     /**
      * Handles the file movements defined in the builder's move steps.
@@ -160,65 +167,6 @@ export class Dependency implements Dependency.Dependency {
                 }
             }
         }
-        return output;
-    }
-    /**
-     * Executes a series of shell commands in a child process, capturing the output and errors for each command.
-     * It writes each command to the child process's stdin and listens for output on stdout and stderr.
-     * The method uses a marker to determine when a command has finished executing, allowing it to capture the complete output for each command before proceeding to the next one.
-     * This function is crucial for running build commands defined in the dependency's configuration, providing feedback on the execution of each command and handling any errors that may arise during the process.
-     * @param commands An array of shell commands to execute.
-     * @param shell The child process in which to execute the commands.
-     * @returns A promise that resolves to an array of string messages indicating the results of the command executions, including any output or errors captured during the process.
-     * @throws Will throw an error if any command fails to execute properly, providing details about the failed command and the associated error message.
-     */
-    protected async executeCommands(commands: string[], shell: ChildProcessWithoutNullStreams): Promise<string[]> {
-        const output: string[] = [];
-
-        shell.stderr.on('data', data => output.push(data.toString()));
-        for (const command of commands) {
-            const result = await this.executeCommand(shell, command);
-            output.push(...result);
-        }
-        shell.kill();
-        return output;
-    }
-    /**
-     * Executes a single shell command in the provided child process, capturing its output and handling errors.
-     * It writes the command to the child process's stdin and listens for output on stdout and stderr.
-     * The method uses a unique marker to determine when the command has finished executing, allowing it to capture the complete output before resolving.
-     * If an error occurs during execution, it captures the error message and rejects the promise with a descriptive error.
-     * This function is essential for running individual build commands as part of the dependency installation process, providing detailed feedback on the execution of each command and ensuring that any issues are properly handled and reported.
-     * @param shell The child process in which to execute the command.
-     * @param command The shell command to execute.
-     * @returns A promise that resolves to an array of string messages indicating the result of the command execution, including any output captured during the process.
-     * @throws Will throw an error if the command fails to execute properly, providing details about the failed command and the associated error message.
-     */
-    protected async executeCommand(shell: ChildProcessWithoutNullStreams, command: string): Promise<string[]> {
-        const output: string[] = [];
-        output.push(`&RRunning command &C4${command}`);
-        await new Promise<void>((resolve, reject) => {
-            shell.stdin.write(command + '\n');
-
-            const marker = `__END_${Date.now()}__`;
-            shell.stdin.write(`echo ${marker}\n`);
-
-            let out: string = '';
-
-            const listener = (data: Buffer) => {
-                if (data.toString().includes(marker)) {
-                    shell.stdout.off('data', listener);
-                    output.push(out.trim());
-                    resolve();
-                } else out += data.toString().trim()
-            };
-            shell.stdout.on('data', listener);
-            shell.stderr.once('data', data => {
-                shell.stdout.off('data', listener);
-                output.push(data.toString().trim());
-                reject(new Error(`Command "${command}" failed with error: ${data.toString().trim()}`));
-            });
-        });
         return output;
     }
     /**
@@ -294,6 +242,10 @@ export namespace Dependency {
     export type Dependency = schemas.dependency['infer'];
     export type newDependency = schemas.dependency['inferToProcess'];
     export interface manageOptions { force?: boolean; }
+    export interface taskOptions {
+        logger?: Logger;
+        maxTimeMs?: number;
+    };
 }
 
 export default Dependency;
