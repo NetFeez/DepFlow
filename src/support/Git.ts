@@ -69,18 +69,11 @@ export class Git {
             const task = new Task(cwd, commands);
             if (logger) {
                 task.on('line', logger.info.bind(logger));
-                task.on('error', (msg, step) => {
-                    logger.error(`&C6[Step ${step}]&C7: &C1${msg}`);
-                });
+                task.on('error', (msg, step) => { logger.error(`&C6[Step ${step}]&C7: &C1${msg}`); });
             }
             task.once('finish', (summary) => {
-                if (summary.fails > 0) {
-                    if (logger) logger.error(`&C1Git clone completed with ${summary.fails} failed steps in ${summary.totalTime}ms.`);
-                    fail(new Error(`Git clone failed with ${summary.fails} failed steps.\nErrors:\n${summary.errors.join('\n')}`));
-                } else {
-                    if (logger) logger.info(`&C2Git clone completed successfully in ${summary.totalTime}ms with ${summary.completes} steps.`);
-                    done(summary);
-                }
+                if (summary.fails === 0) done(summary);
+                else fail(new Error(`Git clone failed with ${summary.fails} failed steps.\nErrors:\n${summary.errors.join('\n')}`));
             });
             task.start().catch(fail);
             return () => { task.stop(); };
