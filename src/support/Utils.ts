@@ -1,7 +1,17 @@
 import { File, Path } from '@netfeez/common-node';
+import Grouper from '@netfeez/vterm/logger/Grouper';
 
 export class Utils {
     protected static REPO_REGEX = /^(?:https:\/\/github\.com\/([^/]+)\/([^/.]+)(?:\.git)?|git@github\.com:([^/]+)\/([^/.]+)(?:\.git)?)$/;
+    public static newGroup(color: `#${string}` | number): Grouper.Group {
+        let code = '';
+        if (typeof color === 'number') {
+            code = color >= 1 && color <= 7 ? `C${color}` : 'R';
+        } else if (typeof color === 'string' && /^#([0-9A-Fa-f]{6})$/.test(color)) {
+            code = `C(${color})`;
+        } else { code = 'R'; }
+        return { open: `&N&${code}╭─`, item: `&N&${code}│ `, line: `&N&${code}├─`, stop: `&N&${code}╰─` };
+    }
     /**
      * Extracts a repository name from its URL.
      * @param repo - The repository URL.

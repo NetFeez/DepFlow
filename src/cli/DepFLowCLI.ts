@@ -15,6 +15,11 @@ export class DepFlowCLI extends DebugUI {
     public constructor(
         public readonly configPath: string = 'depFlow.json'
     ) { super();
+        this.out = new Logger({
+            logger: this.out,
+            formatter: { maxMessageLength: 100 }
+        })
+
         const absoluteConfigPath = path.resolve(process.cwd(), this.configPath);
         this.projectRoot = path.dirname(absoluteConfigPath);
 
@@ -27,99 +32,125 @@ export class DepFlowCLI extends DebugUI {
         this.addCommand('sync', this.commandSync, { usage: 'dep sync', description: 'Syncs depFlow.json with tsconfig.json and generates the importmap.'  });
     }
     public async commandAdd(command: string, args: string[]) {
-        this.out.info(`&C(255,180,220)╭──────────────────────────────────────────────────`);
-        this.out.info(`&C(255,180,220)│ Adding dependency...`);
-        let [repo, name] = args;
         try {
+            let [repo, name] = args;
+
+            this.out.group(Utils.newGroup('#FFB4DC'));
+            this.out.info(`Adding dependency...`);
+
             Validator.validateRepo(repo);
             if (!name) name = Utils.getRepoName(repo);
-            const config = await Config.load(this.configPath);
+
             const dep = schemas.dependency.processData({ name, repo });
+
+            const config = await Config.load(this.configPath);
             config.dependencies.push(dep);
             await Config.save(this.configPath, config);
-            this.out.info(`&C(255,180,220)│ Added dependency "${dep.name}".`);
-        } catch (error) { this.out.error(`&C(255,180,220)│ &C1${error}`); }
-        finally { this.out.info(`&C(255,180,220)╰──────────────────────────────────────────────────`); }
+
+            this.out.info(`Added dependency "${dep.name}".`);
+        } catch (error) { this.out.error(`&C1${error}`); }
+        finally { this.out.groupEnd(); }
     }
     public async commandRemove(command: string, args: string[]) {
-        this.out.info(`&C(255,180,220)╭──────────────────────────────────────────────────`);
-        const [identifier] = args;
         try {
+            const [ identifier ] = args;
+
+            this.out.group(Utils.newGroup('#FFB4DC'));            
             if (!identifier) throw new Error('Usage: dep remove <name> | <repo_url>');
+
             const config = await Config.load(this.configPath);
             config.dependencies = config.dependencies.filter(dep => dep.name !== identifier && dep.repo !== identifier);
             await Config.save(this.configPath, config);
-            this.out.info(`&C(255,180,220)│ Removed dependency "${identifier}".`);
-        } catch (error) { this.out.error(`&C(255,180,220)│ &C1${error}`); }
-        finally { this.out.info(`&C(255,180,220)╰──────────────────────────────────────────────────`); }
+
+            this.out.info(`Removed dependency "${identifier}".`);
+        } catch (error) { this.out.error(`&C1${error}`); }
+        finally { this.out.groupEnd(); }
     }
     public async commandInstall(command: string, args: string[]) {
-        this.out.info(`&C(255,180,220)╭──────────────────────────────────────────────────`);
         try {
+            this.out.group(Utils.newGroup('#FFB4DC'));
+
             const config = await Config.load(this.configPath);
             const dependencies = config.dependencies;
+
             if (dependencies.length === 0) throw new Error(args.length > 0 ? 'Specified dependencies not found.' : 'No dependencies to install.');
+
+            this.out.info(`&C5Installing dependencies...`);
             for (const dep of dependencies) {
-                this.out.info(`&C(255,180,220)│ Installing "${dep.name}" from "${dep.repo}"...`);
-                const dependency = new Dependency(config, dep, this.out);
-                await dependency.install();
-                this.out.info(`&C(255,180,220)│ &C3Installed dependency: &C3${dep.name}`);
-                this.out.info(`&C(255,180,220)│ Installed "${dep.name}".`);
+                try {
+                    this.out.group(Utils.newGroup('#FFB4DC'));
+                    this.out.info(`&C5Installing &C6"${dep.name}" &C5from &C6${dep.repo}&C5...`);
+                    this.out.line();
+
+                    const dependency = new Dependency(config, dep, this.out);
+                    await dependency.install();
+
+                    this.out.line();
+                    this.out.info(`&C2Installed &C6${dep.name}.`);
+                } finally { this.out.groupEnd(); }
             }
-        } catch (error) { this.out.error(`&C(255,180,220)│ &C1${error}`); }
-        finally { this.out.info(`&C(255,180,220)╰──────────────────────────────────────────────────`); }
-        this.commandSync('sync', []);
+            await this.commandSync('sync', []);
+        } catch (error) { this.out.error(`&C1${error}`); }
+        finally { this.out.groupEnd(); }
     }
     public async uninstall(command: string, args: string[]) {
-        this.out.info(`&C(255,180,220)╭──────────────────────────────────────────────────`);
         try {
+            this.out.group(Utils.newGroup('#FFB4DC'));
+
             const config = await Config.load(this.configPath);
             const dependencies = config.dependencies;
+
             if (dependencies.length === 0) throw new Error(args.length > 0 ? 'Specified dependencies not found.' : 'No dependencies to uninstall.');
+
             for (const dep of dependencies) {
-                this.out.info(`&C(255,180,220)│ Uninstalling "${dep.name}" from "${dep.repo}"...`);
-                const dependency = new Dependency(config, dep, this.out);
-                await dependency.uninstall();
-                this.out.info(`&C(255,180,220)│ &C3Uninstalled dependency: &C3${dep.name}`);
-                this.out.info(`&C(255,180,220)│ Uninstalled "${dep.name}".`);
+                try {
+                    this.out.group(Utils.newGroup('#FFB4DC'));
+                    this.out.info(`&C1Uninstalling "${dep.name}" from "${dep.repo}"...`);
+                    this.out.line();
+                    const dependency = new Dependency(config, dep, this.out);
+                    await dependency.uninstall();
+                    this.out.line();
+                    this.out.info(`Uninstalled "${dep.name}".`);
+                    this.out.groupEnd();
+                } finally { this.out.groupEnd(); }
             }
-        } catch (error) { this.out.error(`&C(255,180,220)│ &C1${error}`); }
-        finally { this.out.info(`&C(255,180,220)╰──────────────────────────────────────────────────`); }
+        } catch (error) { this.out.error(`&C1${error}`); }
+        finally { this.out.groupEnd(); }
     }
     public async list(command: string, args: string[]) {
-        this.out.info(`&C(255,180,220)╭──────────────────────────────────────────────────`);
+        this.out.group(Utils.newGroup('#FFB4DC'));
         try {
             const config = await Config.load(this.configPath);
             if (config.dependencies.length === 0) {
-                this.out.info(`&C(255,180,220)│ No dependencies found.`);
+                this.out.info(`No dependencies found.`);
             }
             for (const dep of config.dependencies) {
-                this.out.info(`&C(255,180,220)│ &C3${dep.name} &C(255,180,220)from &C3${dep.repo}`);
+                this.out.info(`&C6${dep.name} &C7from &C2${dep.repo}`);
             }
-        } catch (error) { this.out.error(`&C(255,180,220)│ &C1${error}`); }
-        finally { this.out.info(`&C(255,180,220)╰──────────────────────────────────────────────────`); }
+        } catch (error) { this.out.error(`&C1${error}`); }
+        finally { this.out.groupEnd(); }
     }
     public async rewritePaths(command: string, args: string[]) {
-        this.out.info(`&C(255,180,220)╭──────────────────────────────────────────────────`);
+        this.out.group(Utils.newGroup('#FFB4DC'));
         try {
             const config = await Config.load(this.configPath);
             const watch = args.includes('--watch') || args.includes('-w');
             const useCDN = args.includes('--cdn');
             const mode: PathResolver.Mode = useCDN ? 'cdn' : 'local';
 
-            this.out.info(`&C(255,180,220)│ Mode: &C3${useCDN ? 'CDN' : 'Local'}`);
-            if (watch) this.out.info(`&C(255,180,220)│ Watcher: &C2Enabled`);
+            this.out.info(`Mode: &C3${useCDN ? 'CDN' : 'Local'}`);
+            if (watch) this.out.info(`Watcher: &C2Enabled`);
 
             const resolver = new pathResolver(config, { logger: this.out });
 
             if (watch) await resolver.watch(mode);
             else await resolver.rewritePaths(mode);
-        } catch (error: any) { this.out.error(`&C(255,180,220)│ &C1${error.message || error}`); }
-        finally { this.out.info(`&C(255,180,220)╰──────────────────────────────────────────────────`); }
+        } catch (error: any) { this.out.error(`&C1${error.message || error}`); }
+        finally { this.out.groupEnd(); }
     }
     public async commandSync(command: string, args: string[]) {
-        this.out.info(`&C(255,180,220)╭──────────────────────────────────────────────────`);
-        this.out.info(`&C(255,180,220)│ Synchronizing configurations...`);
+        this.out.group(Utils.newGroup('#FFB4DC'));
+        this.out.info(`Synchronizing configurations...`);
         try {
             const useCDN = args.includes('--cdn');
             const mode: pathResolver.Mode = useCDN ? 'cdn' : 'local';
@@ -135,16 +166,16 @@ export class DepFlowCLI extends DebugUI {
                 const tsconfig = await Tsconfig.load(this.projectRoot, tsconfigFile, { logger: this.out });
                 tsconfig.updatePaths(resolver.aliases);
                 await tsconfig.save();
-            } else this.out.warn(`&C(255,180,220)│ No tsconfig file specified in configuration. Skipping tsconfig synchronization.`);
+            } else this.out.warn(`No tsconfig file specified in configuration. Skipping tsconfig synchronization.`);
             if (importMapFile) {
                 const importmap = await ImportMap.load(this.projectRoot, importMapFile, { logger: this.out });
                 importmap.updateImports(resolver.aliases, mode);
                 await importmap.save();
-            } else this.out.warn(`&C(255,180,220)│ No import map file specified in configuration. Skipping import map synchronization.`);
+            } else this.out.warn(`No import map file specified in configuration. Skipping import map synchronization.`);
 
-            this.out.info(`&C(255,180,220)│ &C2Successfully synced all configurations.`);
-        } catch (error: any) { this.out.error(`&C(255,180,220)│ &C1Error during sync: ${error.message}`); }
-        finally { this.out.info(`&C(255,180,220)╰──────────────────────────────────────────────────`); }
+            this.out.info(`&C2Successfully synced all configurations.`);
+        } catch (error: any) { this.out.error(`&C1Error during sync: ${error.message}`); }
+        finally { this.out.groupEnd(); }
     }
 }
 export namespace DepFlowCLI {}

@@ -15,6 +15,7 @@ import Config from "../config/Config.js";
 import Git from "./Git.js";
 import Async from "./Async.js";
 import Task from "./Task/Task.js";
+import Utils from "./Utils.js";
 
 export class Dependency implements Dependency.Dependency {
     public static include: string[] = [ '*' ];
@@ -48,15 +49,17 @@ export class Dependency implements Dependency.Dependency {
      * @throws Will throw an error if any issues occur during the cloning or pulling process, such as problems with Git commands or file system access.
      */
     protected async update(): Promise<void> {
+        if (this.logger) this.logger.group(Utils.newGroup('#00B4FF'));
         if (await File.exists(this.folder)) {
-            this.logger.log(`&R[${this.name}] &GRepository already exists, pulling latest changes...`);
+            this.logger.log(`&C3Repository already exists, pulling latest changes...`);
             await Git.pull(this.folder, { logger: this.logger });
-            this.logger.log(`&R[${this.name}] &GPull completed successfully.`);
+            this.logger.log(`&C2Pull completed successfully.`);
         } else {
-            this.logger.log(`&R[${this.name}] &GCloning repository from ${this.repo}...`);
+            this.logger.log(`&C5Cloning repository from &C6${this.repo}&C5...`);
             await Git.clone(this.repo, this.folder, { tag: this.tag, logger: this.logger });
-            this.logger.log(`&R[${this.name}] &GClone completed successfully.`);
+            this.logger.log(`&C2Clone completed successfully.`);
         }
+        if (this.logger) this.logger.groupEnd();
     }
     /**
      * Installs the dependency by first cloning its repository (or pulling updates if it already exists) and then executing any build steps defined in the builder property. It manages the entire installation process, including handling the cloning/pulling of the repository and running any necessary commands to set up the dependency according to its configuration. This method ensures that the dependency is properly installed and ready for use, providing feedback on each step of the process through returned messages.
@@ -103,17 +106,25 @@ export class Dependency implements Dependency.Dependency {
      */
     protected async build(): Promise<boolean> {
         if (!this.builder || this.builder.length === 0) return true;
-
-        for (const step of this.builder) {
-            if (step.run) {
-                const commands = Array.isArray(step.run) ? step.run : [ step.run ];
-                await this.runTask(commands, {
-                    logger: this.logger,
-                    maxTimeMs: step.maxTimeMs
-                });
+        try {
+            if (this.logger) this.logger.group(Utils.newGroup('#00f048'));
+            
+            for (const step of this.builder) {
+                if (step.run) {
+                    if (this.logger) this.logger.info(`&C5Running command task...`);
+                    const commands = Array.isArray(step.run) ? step.run : [ step.run ];
+                    await this.runTask(commands, { logger: this.logger, maxTimeMs: step.maxTimeMs });
+                }
+                if (step.move) {
+                    if (this.logger) {
+                        if (step.run) this.logger.line();
+                        this.logger.info(`&C5Running move task...`);
+                    }
+                    await this.move(step.move, this.logger);
+                }
             }
-            if (step.move) {await this.move(step.move);}
-        }
+        } catch(error) { if (this.logger) this.logger.error(`&C1Build failed: ${error}`); return false;}
+        finally { if (this.logger) this.logger.groupEnd(); }
         return true;
     }
     /**
@@ -128,8 +139,8 @@ export class Dependency implements Dependency.Dependency {
         return Async.awaitEvent<void>((done, fail) => {
             const pollito = new Task(this.folder, commands);
             if (logger) {
-                pollito.on('line', (line) => logger.info(`&R[${this.name} Build] &G${line}`));
-                pollito.on('error', (msg, step) => logger.error(`&R[${this.name} Build] &C1[Step ${step}] &C7: &C1${msg}`));
+                pollito.on('line', (line) => logger.info(`${line}`));
+                pollito.on('error', (msg, step) => logger.error(`&C1[Step ${step}]&C7: &C1${msg}`));
             }
             pollito.once('finish', (data) => {
                 if (data.fails > 0) fail(new Error(`Build failed with ${data.fails} failed steps.`));
@@ -148,26 +159,22 @@ export class Dependency implements Dependency.Dependency {
      * @returns A promise that resolves to an array of string messages indicating the results of the file movements, including any errors encountered during the process.
      * @throws Will throw an error if any issues occur during the file movement process, such as missing source paths or problems with file system access.
      */
-    protected async move(move: Dependency.Builder['move']): Promise<string[]> {
-        if (!move) return [];
-        const output: string[] = [];
+    protected async move(move: Dependency.Builder['move'], logger: Logger): Promise<void> {
+        if (!move) return;
         if (typeof move === 'string' || Array.isArray(move)) {
             const moves = Array.isArray(move) ? move : [ move ];
             for (const destination of moves) {
-                const moveResult = await this.moveFiles(destination);
-                output.push(...moveResult);
+                await this.moveFiles(destination, undefined, logger);
             }
         } else {
             for (const key in move) {
                 const value = move[key];
                 const destinations = typeof value === 'string' ? [ value ] : value;
                 for (const destination of destinations) {
-                    const moveResult = await this.moveFiles(destination, key);
-                    output.push(...moveResult);
+                    await this.moveFiles(destination, key, logger);
                 }
             }
         }
-        return output;
     }
     /**
      * Handles the file movements for a specific source and destination.
@@ -180,8 +187,7 @@ export class Dependency implements Dependency.Dependency {
      * @returns A promise that resolves to an array of string messages indicating the results of the file movements, including any errors encountered during the process.
      * @throws Will throw an error if any issues occur during the file movement process, such as missing source paths or problems with file system access.
      */
-    protected async moveFiles(destination: string | string[], source?: string): Promise<string[]> {
-        const output: string[] = [];
+    protected async moveFiles(destination: string | string[], source?: string, logger?: Logger): Promise<void> {
         destination = Array.isArray(destination) ? destination : [ destination ];
         source = Dependency.getSourcePath(this.folder, source);
         for (const folder of destination) {
@@ -194,11 +200,10 @@ export class Dependency implements Dependency.Dependency {
                         if (!await File.exists(toCreate)) await FS.mkdir(toCreate, { recursive: true });
                     }
                 }
-                output.push(`&RMoving source &C4${source} &Rto &C4${folder}`);
+                if (logger) logger.info(`&RMoving source &C4${source} &Rto &C4${folder}`);
                 await FS.cp(source, folder, { recursive: true, force: true });
             } catch (error) { throw new Error(`Failed to move files from ${this.name} to ${folder}, \n${error}`); }
         }
-        return output;
     }
     /**
      * Constructs the source path for file movements based on the dependency's folder and an optional specific source path.
