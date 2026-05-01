@@ -1,14 +1,15 @@
+import path from "node:path";
+
 import Logger, { DebugUI } from "@netfeez/vterm";
 
-import Validator from "../support/Validator.js";
 import Utils from "../support/Utils.js";
+import Validator from "../support/Validator.js";
+import Dependency from "../support/Dependency/Dependency.js";
+import pathResolver, { PathResolver } from "../support/PathResolver/PathResolver.js";
 import Config from "../config/Config.js";
 import schemas from "../config/schemas.js";
-import Dependency from "../support/Dependency.js";
 import Tsconfig from "../config/Tsconfig.js";
-import pathResolver, { PathResolver } from "../support/PathResolver/PathResolver.js";
 import ImportMap from "../config/ImportMap.js";
-import path from "node:path";
 
 export class DepFlowCLI extends DebugUI {
     protected readonly projectRoot: string;
