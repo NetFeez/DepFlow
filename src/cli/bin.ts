@@ -6,7 +6,7 @@ import Schemas from "../config/schemas.js";
 
 function startupSchemaValidation(flowPath: string) {
     const jsonSchema = Schemas.Config.jsonSchema;
-    Utils.addVscodeValidation(flowPath, jsonSchema);
+    // Utils.addVscodeValidation(flowPath, jsonSchema);
 }
 
 const skip = 2;
@@ -18,10 +18,11 @@ const flowTag = (
 );
 
 const flowPath = flowTag[0] || 'depflow.json';
+
 const cli = new DepFlowCLI(flowPath);
 
 startupSchemaValidation(flowPath);
-console.log(flowPath);
+
 try {
     if (commandName !== null) {
         const command = cli.getCommand(commandName);
@@ -33,8 +34,8 @@ try {
         }
     } else cli.start();
 } catch (error: any) {
-    cli.out.error(`&C(255,180,220)╭─────────────────────────────────────────────`);
-    cli.out.error(`&C(255,180,220)│ &C1${error?.stack || error}`);
-    cli.out.error(`&C(255,180,220)╰─────────────────────────────────────────────`);
+    cli.out.error(`&C(#FFB4DC)╭─────────────────────────────────────────────`);
+    cli.out.error(`&C(#FFB4DC)│ &C1${error?.stack || error}`);
+    cli.out.error(`&C(#FFB4DC)╰─────────────────────────────────────────────`);
     process.exit(1)
 }
