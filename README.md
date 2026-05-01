@@ -1,100 +1,171 @@
-# 🚀 DepFlow (Dependency Flow)
+# DepFlow — Dependency Flow Manager
 
-**DepFlow** is a lightweight, high-performance dependency manager that leverages Git repositories and NPM packages to orchestrate your project's infrastructure. Designed for the **NetFeez** ecosystem, it allows you to manage dependencies directly from their source without the overhead of traditional package managers.
+DepFlow is a focused dependency orchestration tool that lets projects consume Git repositories and NPM packages as managed dependencies. It simplifies building, extracting, and mapping artifacts into your application (for example, populating an `importmap` or TypeScript `paths`).
 
-Starting with **v2.0.0**, DepFlow introduces a schema-driven architecture that automatically configures your development environment, providing a seamless experience in editors like VSCode.
+Key goals:
+- Keep repository-sourced modules reproducible and buildable.
+- Provide automatic path/importmap resolution for browser and TypeScript workflows.
+- Support lightweight builder pipelines for extracted artifacts.
 
 ---
 
-# 💾 Installation
+## Features
+- Git-based dependencies with optional build pipelines
+- NPM dependency extraction and local mirroring
+- Automatic `tsconfig` paths and browser `importmap` generation via `dep sync`
+- Flexible resolver aliases for local and CDN targets
 
-Install DepFlow globally using **npm**:
+---
 
-```console
+## Installation
+
+Install globally with npm to use the CLI system-wide:
+
+```bash
 npm install -g @netfeez/depflow
 ```
 
-> [!TIP]
-> Global installation makes the `dep` command available everywhere. For version 2.0.0, ensure you are using the `@netfeez` scope.
+Alternatively, add it as a dev-dependency for project-specific usage.
 
 ---
 
-# 💻 CLI Usage
+## Quick Start
 
-DepFlow offers a clean interface for managing your project's lifecycle:
+1. Create a configuration file (recommended name: `depflow.json`).
+2. Run `dep install` to fetch and build all configured dependencies.
+3. Run `dep sync` to update `tsconfig` paths and `importmap` (if configured).
 
-### Commands
+CLI examples:
 
-| Command | Usage | Description |
-|---|---|---|
-| `sync` | `dep sync` | **(New)** Synchronizes `tsconfig.json` paths and `importmap` based on your config. |
-| `install`| `dep install [name...]`| Clones, builds, and sets up all or specific dependencies. |
-| `list` | `dep list` | Lists all dependencies configured in your project. |
-| `add` | `dep add <repo_url> [name]` | Adds a new repository dependency to your configuration. |
-| `remove`| `dep remove <name>` | Removes a dependency from the configuration. |
-| `uninstall`| `dep uninstall [name...]`| Removes the local files of your dependencies. |
+```bash
+# install dependencies defined in .df.json
+dep install
+# --flow filepath.json for use an specific config
+
+# sync tsconfig/importmap from the configuration
+dep sync
+```
 
 ---
 
-# ⚙️ Configuration File (`depflow.json`)
+## Configuration
 
-The configuration has evolved from a simple array to a powerful object schema.
+DepFlow uses a JSON configuration file describing where to fetch dependencies and how to build and expose them. The minimal structure:
 
-## New Schema Structure
+- `flowFolder` (string): folder where DepFlow stores temporary state (default: `.depflow`).
+- `outDir` (string): project output root used by extract rules.
+- `tsconfig` (string|null): optional path to TypeScript `tsconfig.json` to update `compilerOptions.paths`.
+- `importmap` (string|null): optional path to write a browser `importmap`.
+- `dependencies` (array): Git-based dependencies.
+- `npmDependencies` (array): NPM packages to extract files from.
+
+Each dependency supports `builder` steps (run commands, file extraction) and `resolver` entries that map aliases to local or CDN targets.
+
+### Example Configuration
+
+Below is an example adapted from a real project configuration. Use it as a template for your repository.
 
 ```json
 {
     "flowFolder": ".depflow",
-    "tsconfig": "tsconfig.json",
-    "importmap": "importmap.json",
+    "outDir": ".",
+    "tsconfig": "tsconfig.web.json",
+    "importmap": "public/importmap.json",
     "dependencies": [
         {
-            "name": "my-library",
-            "repo": "https://github.com/user/my-library.git",
-            "tag": "main",
+            "name": "NetFeez.Vizui",
+            "repo": "https://github.com/NetFeez/Vizui.git",
             "builder": [
-                { "run": "npm install", "maxTimeMs": 10000 },
-                { "move": { "build": "web/logic/.lib/my-lib" } }
+                {
+                    "run": ["npm install", "npm run compile"],
+                    "extract": [
+                        { "from": "build/**/*.js", "to": "public/lib/vizui/", "replacer": "^build/" },
+                        { "from": "build/**/*.d.ts", "to": "public/lib/vizui/", "replacer": "^build/" }
+                    ]
+                }
             ],
             "resolver": [
+                { "alias": "vizui", "target": "public/lib/vizui/vizui.js" },
+                { "alias": "vizui/*", "target": "public/lib/vizui/*" }
+            ]
+        }
+    ],
+    "npmDependencies": [
+        {
+            "name": "@netfeez/common",
+            "version": "latest",
+            "builder": [
                 {
-                    "alias": "my-lib",
-                    "target": {
-                        "local": "./web/logic/.lib/my-lib/index.js",
-                        "cdn": "https://cdn.com/my-lib.js"
-                    }
+                    "extract": [
+                        { "from": "build/**/*.js", "to": "public/lib/common/", "replacer": "^build/" },
+                        { "from": "build/**/*.d.ts", "to": "public/lib/common/", "replacer": "^build/" }
+                    ]
                 }
+            ],
+            "resolver": [
+                { "alias": "@netfeez/common", "target": "public/lib/common/index.js" },
+                { "alias": "@netfeez/common/*", "target": "public/lib/common/*" }
             ]
         }
     ]
 }
 ```
 
-## Fields Explained
+### Builder rules
+- `run`: a string or array of shell commands executed inside the dependency checkout.
+- `extract`: patterns describing which files to copy from the dependency build output into your project. Each extractor may include `from`, `to`, and an optional `replacer` regex used to rewrite paths.
 
-### Root Configuration
-* **`flowFolder`** (string): The directory where DepFlow stores internal data (default: `.depflow`).
-* **`tsconfig`** (string, optional): Path to your TypeScript config. When set, `dep sync` will automatically manage your `compilerOptions.paths`.
-* **`importmap`** (string, optional): Path to your importmap file. When set, `dep sync` keeps your browser imports up to date.
-* **`dependencies`** (array): Your list of Git-based dependencies.
-
-### Dependency Object
-* **`name`** (string): Unique identifier for the dependency.
-* **`repo`** (string): The Git repository URL.
-* **`tag`** (string, optional): **(New)** Specify a branch, tag, or commit hash (e.g., `main`, `v1.2.0`).
-* **`builder`**: A pipeline to build and organize the dependency files.
-  * **`run`** (string | string[]): Command(s) to execute (e.g., `npm run compile`).
-  * **`move`** (string | object): Defines where to place the built files.
-* **`resolver`**: **(Renamed)** Configuration for path mapping.
-  *  alias`**: The import alias (e.g., `my-lib`).
-  *   **`target`**: Can be a string path or an object defining `local` and `cdn` targets for hybrid environments.
+### Resolver entries
+- `alias`: module alias exposed to your project (used in `importmap` and `tsconfig` paths).
+- `target`: a string path or an object with `local` and `cdn` properties for multi-target deployments.
 
 ---
 
-# 🚀 Migration to v2.0.0
+## CLI Reference
 
-To upgrade from v1:
-1.  Wrap your existing array into a `{"dependencies": [...]}` object.
-2.  Rename any `pathResolver` fields to `resolver`.
-3.  Add the `$schema` field to enable VSCode autocompletion and validation.
-4.  Run `dep sync` to initialize your environment.
+Use the distribution script in `build/cli/bin.js` or install the package globally.
+
+- `install`: Clone, build and extract artifacts for all dependencies in your config.
+- `sync`: Generate/update `tsconfig` paths and browser `importmap` according to `resolver` entries.
+- `list`: Show configured dependencies and their status.
+
+Use `node ./build/cli/bin.js <command> --flow <config>` when running locally from the repository.
+
+### Commands
+
+The CLI exposes the following commands (all commands accept the global `--flow <file>` flag to specify a custom configuration file):
+
+| Command | Usage | Description |
+|---|---|---|
+| `add` | `dep add <repo_url> [name] [--flow <file>]` | Add a git dependency to the configuration file. If the configuration file does not exist it will be created automatically (default: `depflow.json`). If `name` is omitted the repo name is used. |
+| `remove` | `dep remove <name|repo_url> [--flow <file>]` | Remove a dependency by `name` or repository URL. |
+| `install` | `dep install [name1 name2 ...] [--flow <file>]` | Clone, build and extract artifacts for all or specific dependencies. Runs `dep sync` after install. |
+| `uninstall` | `dep uninstall [name1 name2 ...] [--flow <file>]` | Remove local files for configured dependencies. |
+| `list` | `dep list [--flow <file>]` | List all dependencies declared in the configuration. |
+| `rewrite-paths` | `dep rewrite-paths [--watch] [--cdn] [--flow <file>]` | Rewrite built files' paths according to resolver aliases. Use `--watch` to run a watcher; use `--cdn` to apply CDN targets instead of local targets. |
+| `sync` | `dep sync [--cdn] [--flow <file>]` | Update `tsconfig` paths and generate `importmap` from resolver aliases. Use `--cdn` to prefer CDN targets when generating the importmap. |
+
+### Flags
+
+- `--flow <file>`: Specify an alternate configuration file (for example `.df.json` or `depflow.json`). If omitted, the CLI defaults to `depflow.json` in the current working directory.
+- `--cdn`: When present for `sync` or `rewrite-paths`, instructs the tool to use CDN targets from resolver entries instead of `local` targets when generating the `importmap` or rewriting paths.
+- `--watch` / `-w`: For `rewrite-paths` only — run a file watcher that keeps rewriting paths as files change.
+
+Examples:
+
+```bash
+# install using custom flow file
+dep install --flow .df.json
+
+# sync using CDN targets for importmap
+dep sync --flow .df.json --cdn
+
+# rewrite paths and start watcher (local targets)
+dep rewrite-paths --flow .df.json --watch
+```
+
+---
+
+If you want, I can also:
+- add quick examples for `tsconfig` path snippets generated by `dep sync`,
+- or produce a Spanish summary for quick internal reference.
