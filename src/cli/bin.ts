@@ -14,12 +14,11 @@ async function startupSchemaValidation(flowPath: string) {
 }
 
 const skip = 2;
-const [commandName, ...args] = process.argv.slice(skip);
+const [commandName, ...argsList] = process.argv.slice(skip);
 
-const flowTag = (
-    Utils.getFlagValue(args, '--flow') ||
-    Utils.getFlagValue(args, '-f')
-);
+const { args, flags } = Utils.extractFlags(argsList);
+console.log(commandName, args, flags);
+const flowTag = flags['--flow'] || flags['-f'] || [];
 
 const flowPath = flowTag[0] || 'depflow.json';
 
