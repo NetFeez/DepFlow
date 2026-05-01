@@ -101,8 +101,47 @@ export class Utils {
             }, delay);
         };
     }
+    public static extractFlags(args: string[]): Utils.FlagResult {
+        const purifiedArgs: string[] = [];
+        const flags: Utils.FlagMap = {};
+
+        for (let i = 0; i < args.length; i++) {
+            const arg = args[i];
+
+            if (!arg.startsWith('-')) {
+                purifiedArgs.push(arg);
+                continue;
+            }
+
+            let [key, value] = arg.split('=');
+
+            if (value !== undefined) {
+                if (!flags[key]) flags[key] = [];
+                flags[key].push(value);
+                continue;
+            }
+
+            const nextArg = args[i + 1];
+            if (nextArg && !nextArg.startsWith('-')) {
+                if (!flags[key]) flags[key] = [];
+                flags[key].push(nextArg);
+                i++;
+            } else {
+                if (!flags[key]) flags[key] = [];
+            }
+        }
+
+        return { args: purifiedArgs, flags };
+    }
 }
 export namespace Utils {
+    export interface FlagMap {
+        [flag: string]: string[];
+    }
+    export interface FlagResult {
+        args: string[];
+        flags: FlagMap;
+    }
     export type DebouncedFunction<Args extends any[]> = (...args: Args) => void;
 }
 export default Utils;
