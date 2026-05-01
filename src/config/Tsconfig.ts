@@ -33,12 +33,22 @@ export class Tsconfig {
             target = target.startsWith('.') ? target : `./${target}`;
             target = Path.normalize(target);
 
+            let typeTarget: string | undefined;
+            if (aliasObj.targets.type) {
+                typeTarget = Path.diff(this.projectRoot, aliasObj.targets.type);
+                typeTarget = typeTarget.startsWith('.') ? typeTarget : `./${typeTarget}`;
+                typeTarget = Path.normalize(typeTarget);
+            }
+
             if (aliasObj.isWildcard) {
                 const suffix = target.endsWith('/') ? '*' : '/*';
                 target = `${target}${suffix}`;
+                if (typeTarget) {
+                    typeTarget = `${typeTarget}${suffix}`;
+                }
             }
 
-            this.data.compilerOptions.paths[key] = [target];
+            this.data.compilerOptions.paths[key] = typeTarget ? [typeTarget, target] : [target];
         }
     }
     /**

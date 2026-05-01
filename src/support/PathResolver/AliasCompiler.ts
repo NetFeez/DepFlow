@@ -29,11 +29,17 @@ export class AliasCompiler {
                     : path.resolve(this.projectRoot, Utils.removeWildcardSuffix(rawLocal));
 
                 let cdnTarget: string | undefined;
-                if (typeof entry.target === 'object' && entry.target.cdn) {
-                    cdnTarget = Utils.removeWildcardSuffix(entry.target.cdn);
+                let typeTarget: string | undefined;
+                if (typeof entry.target === 'object') {
+                    if (entry.target.type) {
+                        typeTarget = Utils.removeWildcardSuffix(entry.target.type);
+                    }
+                    if (entry.target.cdn) {
+                        cdnTarget = Utils.removeWildcardSuffix(entry.target.cdn);
+                    }
                 }
 
-                result.push({ alias, isWildcard, targets: { local: localTarget, cdn: cdnTarget } });
+                result.push({ alias, isWildcard, targets: { local: localTarget, type: typeTarget, cdn: cdnTarget } });
             }
         }
         return result;
@@ -42,6 +48,7 @@ export class AliasCompiler {
 export namespace AliasCompiler {
     export interface Target {
         local: string;
+        type?: string;
         cdn?: string;
     }
     export interface CompiledAlias {

@@ -36,6 +36,7 @@ export const ResolverEntry = Schema.fromObject({
         { type: 'string' },
         { type: 'object', properties: {
             local: { type: 'string', required: true },
+            type: { type: 'string' },
             cdn: { type: 'string' }
         } }
     ], required: true }
