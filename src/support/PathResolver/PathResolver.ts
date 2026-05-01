@@ -47,7 +47,12 @@ export class PathResolver {
         
         if (!await File.exists(this.absoluteOutDir)) return void this.logger.warn(`Directory &C4${this.absoluteOutDir}&R not found.`);
 
-        const files = await File.getAllFiles(this.absoluteOutDir, PathResolver.EXTENSIONS);
+        // const files = await File.getAllFiles(this.absoluteOutDir, PathResolver.EXTENSIONS);
+        const files = [];
+        files.push(...await File.find('**/*.js'));
+        files.push(...await File.find('**/*.ts'));
+        files.push(...await File.find('**/*.jsx'));
+        files.push(...await File.find('**/*.tsx'));
 
         let rewrittenCount = 0;
         for (const file of files) {
@@ -105,12 +110,10 @@ export class PathResolver {
         });
     }
 }
-
 export namespace PathResolver {
     export type Mode = 'local' | 'cdn';
     export interface Options {
         logger?: Logger;
     }
 }
-
 export default PathResolver;
