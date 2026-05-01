@@ -16,7 +16,7 @@ import Builder from '../Builder/Builder.js';
 
 export class GitDependency extends Dependency implements GitDependency.Dependency {
     public readonly repo: GitDependency.repo;
-    public readonly tag?: string;
+    public readonly tag: string;
 
     public constructor(
         public readonly flowFolder: string,

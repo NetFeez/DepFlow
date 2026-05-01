@@ -2,8 +2,8 @@ import { Schema } from '@netfeez/common';
 import { version } from 'node:os';
 
 export const ImportMap = Schema.fromObject({
-    imports: { type: 'object' },
-    scopes: { type: 'object' }
+    imports: { type: 'object', default: {} },
+    scopes: { type: 'object', default: {} }
 });
 
 export const TsConfig = Schema.fromObject({
@@ -12,7 +12,7 @@ export const TsConfig = Schema.fromObject({
         rootDir: { type: 'string' },
         outDir: { type: 'string' },
         paths: { type: 'object' }
-    }, allowAdditionalProperties: true },
+    }, allowAdditionalProperties: true }
 }, true);
 
 export const ExtractorEntry = Schema.fromObject({
@@ -44,7 +44,7 @@ export const ResolverEntry = Schema.fromObject({
 export const GitDependency = Schema.fromObject({
     name: { type: 'string', required: true },
     repo: { type: 'string', required: true },
-    tag: { type: 'string' },
+    tag: { type: 'string', default: 'main' },
     builder: { type: 'array', default: [], items: BuilderEntry.root },
     resolver: { type: 'array', nullable: true, default: [], items: ResolverEntry.root }
 });
@@ -57,8 +57,9 @@ export const NpmDependency = Schema.fromObject({
 });
 
 export const Config = Schema.fromObject({
+    $schema: { type: 'string', default: '.depflow/schema.json' },
     flowFolder: { type: 'string', default: '.depflow' },
-    outDir: { type: 'string', default: '.' },
+    outDir: { type: 'string', default: 'dist' },
     tsconfig: { type: 'string', nullable: true, default: null },
     importmap: { type: 'string', nullable: true, default: null },
     dependencies: {  type: 'array',  default: [],  items: GitDependency.root },
