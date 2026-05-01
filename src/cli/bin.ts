@@ -2,10 +2,10 @@
 
 import DepFlowCLI from "./DepFLowCLI.js";
 import { Utils } from "../support/Utils.js";
-import schemas from "../config/schemas.js";
+import Schemas from "../config/schemas.js";
 
 function startupSchemaValidation(flowPath: string) {
-    const jsonSchema = schemas.config.jsonSchema;
+    const jsonSchema = Schemas.Config.jsonSchema;
     Utils.addVscodeValidation(flowPath, jsonSchema);
 }
 

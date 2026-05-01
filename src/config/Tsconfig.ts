@@ -3,7 +3,7 @@ import PATH from 'node:path';
 import { Logger } from '@netfeez/vterm';
 import { File, Path } from '@netfeez/common-node';
 
-import schemas from "./schemas.js";
+import Schemas from "./schemas.js";
 import AliasCompiler from '../support/PathResolver/AliasCompiler.js';
 
 export class Tsconfig {
@@ -29,7 +29,8 @@ export class Tsconfig {
         for (const aliasObj of aliases) {
             const key = aliasObj.isWildcard ? `${aliasObj.alias}/*` : aliasObj.alias;
             
-            let target = PATH.relative(this.projectRoot, aliasObj.targets.local);
+            let target = Path.diff(this.projectRoot, aliasObj.targets.local);
+            target = target.startsWith('.') ? target : `./${target}`;
             target = Path.normalize(target);
 
             if (aliasObj.isWildcard) {
@@ -68,7 +69,7 @@ export class Tsconfig {
         if (!await File.exists(folder)) await File.mkdir(folder, { recursive: true });
         const json = JSON.stringify(data, null, 4);
         await File.write(tsconfigPath, json);
-        logger.log(`&C2Updated &C4${filename}&C2 successfully.`);
+        logger.log(`&C2Saved file &C4${filename}&C2 successfully.`);
     }
     /**
      * Static method to load tsconfig data from a specified file.
@@ -87,18 +88,18 @@ export class Tsconfig {
         let data: Tsconfig.Data;
         if (!await File.exists(tsconfigPath)) {
             logger.warn(`&C3${filename} not found. Creating defaults...`);
-            data = schemas.basicTsconfig.processData({});
-            this.save(projectRoot, filename, data, { logger }).catch(err => logger.error(`Failed to create default tsconfig:`, err.message));
+            data = Schemas.TsConfig.processData({});
+            // this.save(projectRoot, filename, data, { logger }).catch(err => logger.error(`Failed to create default tsconfig:`, err.message));
         } else {
             const content = await File.read(tsconfigPath, 'utf-8');
             const json = JSON.parse(content);
-            data = schemas.basicTsconfig.processData(json);
+            data = Schemas.TsConfig.processData(json);
         } return new Tsconfig(data, projectRoot, filename, { logger });
     }
 }
 
 export namespace Tsconfig {
-    export type Data = schemas.basicTsconfig['infer'];
+    export type Data = Schemas.TsConfig['infer'];
     export interface Options {
         logger?: Logger
     }

@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import schemas from '../../config/schemas.js';
+import Schemas from '../../config/schemas.js';
 import Utils from './Utils.js';
 
 export class AliasCompiler {
@@ -12,7 +12,7 @@ export class AliasCompiler {
      * @param config The configuration object containing dependencies with resolver entries to compile into aliases.
      * @returns An array of compiled alias objects ready for use in path resolution.
      */
-    public compile(config: schemas.config['infer']): AliasCompiler.CompiledAlias[] {
+    public compile(config: Schemas.Config['infer']): AliasCompiler.CompiledAlias[] {
         const result: AliasCompiler.CompiledAlias[] = [];
         const allDeps = [...(config.dependencies || []), ...(config.npmDependencies || [])];
 

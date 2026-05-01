@@ -4,12 +4,13 @@ import Logger, { DebugUI } from "@netfeez/vterm";
 
 import Utils from "../support/Utils.js";
 import Validator from "../support/Validator.js";
-import Dependency from "../support/Dependency/Dependency.js";
-import pathResolver, { PathResolver } from "../support/PathResolver/PathResolver.js";
+import GitDependency from "../support/Dependency/GitDependency.js";
+import PathResolver from "../support/PathResolver/PathResolver.js";
 import Config from "../config/Config.js";
-import schemas from "../config/schemas.js";
+import Schemas from "../config/schemas.js";
 import Tsconfig from "../config/Tsconfig.js";
 import ImportMap from "../config/ImportMap.js";
+import NpmDependency from "../support/Dependency/NpmDependency.js";
 
 export class DepFlowCLI extends DebugUI {
     protected readonly projectRoot: string;
@@ -42,7 +43,7 @@ export class DepFlowCLI extends DebugUI {
             Validator.validateRepo(repo);
             if (!name) name = Utils.getRepoName(repo);
 
-            const dep = schemas.dependency.processData({ name, repo });
+            const dep = Schemas.GitDependency.processData({ name, repo });
 
             const config = await Config.load(this.configPath);
             config.dependencies.push(dep);
@@ -72,24 +73,40 @@ export class DepFlowCLI extends DebugUI {
             this.out.group(Utils.newGroup('#FFB4DC'));
 
             const config = await Config.load(this.configPath);
-            const dependencies = config.dependencies;
+            const gitDependencies = config.dependencies;
 
-            if (dependencies.length === 0) throw new Error(args.length > 0 ? 'Specified dependencies not found.' : 'No dependencies to install.');
+            if (gitDependencies.length === 0) throw new Error(args.length > 0 ? 'Specified dependencies not found.' : 'No dependencies to install.');
 
             this.out.info(`&C5Installing dependencies...`);
-            for (const dep of dependencies) {
+            for (const dep of gitDependencies) {
                 try {
                     this.out.group(Utils.newGroup('#FFB4DC'));
                     this.out.info(`&C5Installing &C6"${dep.name}" &C5from &C6${dep.repo}&C5...`);
                     this.out.line();
 
-                    const dependency = new Dependency(config, dep, this.out);
+                    const dependency = new GitDependency(config.flowFolder, dep, this.out);
                     await dependency.install();
 
                     this.out.line();
                     this.out.info(`&C2Installed &C6${dep.name}.`);
                 } finally { this.out.groupEnd(); }
             }
+
+            const npmDependencies = config.npmDependencies;
+            for (const dep of npmDependencies) {
+                try {
+                    this.out.group(Utils.newGroup('#FFB4DC'));
+                    this.out.info(`&C5Installing npm dependency &C6"${dep.name}" &C5version &C6${dep.version}&C5...`);
+                    this.out.line();
+
+                    const dependency = new NpmDependency(config.flowFolder, dep, this.out);
+                    await dependency.install();
+
+                    this.out.line();
+                    this.out.info(`&C2Installed npm dependency &C6${dep.name}.`);
+                } finally { this.out.groupEnd(); }
+            }
+
             await this.commandSync('sync', []);
         } catch (error) { this.out.error(`&C1${error}`); }
         finally { this.out.groupEnd(); }
@@ -108,7 +125,7 @@ export class DepFlowCLI extends DebugUI {
                     this.out.group(Utils.newGroup('#FFB4DC'));
                     this.out.info(`&C1Uninstalling "${dep.name}" from "${dep.repo}"...`);
                     this.out.line();
-                    const dependency = new Dependency(config, dep, this.out);
+                    const dependency = new GitDependency(config.flowFolder, dep, this.out);
                     await dependency.uninstall();
                     this.out.line();
                     this.out.info(`Uninstalled "${dep.name}".`);
@@ -142,7 +159,7 @@ export class DepFlowCLI extends DebugUI {
             this.out.info(`Mode: &C3${useCDN ? 'CDN' : 'Local'}`);
             if (watch) this.out.info(`Watcher: &C2Enabled`);
 
-            const resolver = new pathResolver(config, { logger: this.out });
+            const resolver = new PathResolver(config, { logger: this.out });
 
             if (watch) await resolver.watch(mode);
             else await resolver.rewritePaths(mode);
@@ -150,15 +167,16 @@ export class DepFlowCLI extends DebugUI {
         finally { this.out.groupEnd(); }
     }
     public async commandSync(command: string, args: string[]) {
-        this.out.group(Utils.newGroup('#FFB4DC'));
-        this.out.info(`Synchronizing configurations...`);
         try {
+            this.out.group(Utils.newGroup('#FFB4DC'));
+            this.out.info(`Synchronizing configurations...`);
+
             const useCDN = args.includes('--cdn');
-            const mode: pathResolver.Mode = useCDN ? 'cdn' : 'local';
+            const mode: PathResolver.Mode = useCDN ? 'cdn' : 'local';
             
             
             const config = await Config.load(this.configPath);
-            const resolver = new pathResolver(config, { logger: this.out });
+            const resolver = new PathResolver(config, { logger: this.out });
             
             const tsconfigFile = config.tsconfig;
             const importMapFile = config.importmap;
@@ -175,7 +193,7 @@ export class DepFlowCLI extends DebugUI {
             } else this.out.warn(`No import map file specified in configuration. Skipping import map synchronization.`);
 
             this.out.info(`&C2Successfully synced all configurations.`);
-        } catch (error: any) { this.out.error(`&C1Error during sync: ${error.message}`); }
+        } catch (error) { this.out.error(`&C1Error during sync: ${error}`); }
         finally { this.out.groupEnd(); }
     }
 }

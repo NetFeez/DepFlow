@@ -1,11 +1,12 @@
 import { Schema } from '@netfeez/common';
+import { version } from 'node:os';
 
-export const basicImportmap = Schema.fromObject({
+export const ImportMap = Schema.fromObject({
     imports: { type: 'object' },
     scopes: { type: 'object' }
 });
 
-export const basicTsconfig = Schema.fromObject({
+export const TsConfig = Schema.fromObject({
     compilerOptions: { type: 'object', properties: {
         baseUrl: { type: 'string' },
         rootDir: { type: 'string' },
@@ -14,7 +15,7 @@ export const basicTsconfig = Schema.fromObject({
     }, allowAdditionalProperties: true },
 }, true);
 
-export const extractEntry = Schema.fromObject({
+export const ExtractorEntry = Schema.fromObject({
     from: { type: 'string', required: true },
     to: { type: 'string', required: true },
     replacer: { union: [ { type: 'string' }, { type: 'object', properties: {
@@ -23,13 +24,13 @@ export const extractEntry = Schema.fromObject({
     } } ], nullable: true }
 });
 
-export const builder = Schema.fromObject({
+export const BuilderEntry = Schema.fromObject({
     maxTimeMs: { type: 'number', default: 60000 },
     run: {  union: [ { type: 'string' },  { type: 'array', items: { type: 'string' } } ]  },
-    extract: {  union: [ { type: 'string' }, { type: 'array', items: extractEntry.root } ]  }
+    extract: {  union: [ { type: 'string' }, { type: 'array', items: ExtractorEntry.root } ]  }
 });
 
-export const pathResolverEntry = Schema.fromObject({
+export const ResolverEntry = Schema.fromObject({
     alias: { type: 'string', required: true },
     target: { union: [
         { type: 'string' },
@@ -40,36 +41,45 @@ export const pathResolverEntry = Schema.fromObject({
     ], required: true }
 });
 
-export const dependency = Schema.fromObject({
+export const GitDependency = Schema.fromObject({
     name: { type: 'string', required: true },
     repo: { type: 'string', required: true },
     tag: { type: 'string' },
-    builder: { type: 'array', default: [], items: builder.root },
-    resolver: { type: 'array', nullable: true, default: [], items: pathResolverEntry.root }
+    builder: { type: 'array', default: [], items: BuilderEntry.root },
+    resolver: { type: 'array', nullable: true, default: [], items: ResolverEntry.root }
 });
 
-export const npmDependencySchema = Schema.fromObject({
+export const NpmDependency = Schema.fromObject({
     name: { type: 'string', required: true },
-    resolver: { type: 'array', nullable: true, default: [], items: pathResolverEntry.root }
+    version: { type: 'string', required: true },
+    builder: { type: 'array', default: [], items: BuilderEntry.root },
+    resolver: { type: 'array', nullable: true, default: [], items: ResolverEntry.root }
 });
 
-export const config = Schema.fromObject({
+export const Config = Schema.fromObject({
     flowFolder: { type: 'string', default: '.depflow' },
     outDir: { type: 'string', default: '.' },
     tsconfig: { type: 'string', nullable: true, default: null },
     importmap: { type: 'string', nullable: true, default: null },
-    dependencies: {  type: 'array',  default: [],  items: dependency.root },
-    npmDependencies: { type: 'array', default: [], items: npmDependencySchema.root }
+    dependencies: {  type: 'array',  default: [],  items: GitDependency.root },
+    npmDependencies: { type: 'array', default: [], items: NpmDependency.root }
 });
 
-export const schemas = { basicTsconfig, config, builder, pathResolver: pathResolverEntry, dependency };
-export namespace schemas {
-    export type config = typeof config;
-    export type builder = typeof builder;
-    export type pathResolverEntry = typeof pathResolverEntry;
-    export type dependency = typeof dependency;
-    export type basicTsconfig = typeof basicTsconfig;
-    export type extractor = typeof extractEntry;
+export const Schemas = {
+    Config,
+    TsConfig, ImportMap,
+    BuilderEntry, ResolverEntry,
+    GitDependency, NpmDependency
+};
+export namespace Schemas {
+    export type Config = typeof Config;
+    export type BuilderEntry = typeof BuilderEntry;
+    export type ResolverEntry = typeof ResolverEntry;
+    export type GitDependency = typeof GitDependency;
+    export type NpmDependency = typeof NpmDependency;
+    export type TsConfig = typeof TsConfig;
+    export type ImportMap = typeof ImportMap;
+    export type ExtractorEntry = typeof ExtractorEntry;
 }
 
-export default schemas;
+export default Schemas;

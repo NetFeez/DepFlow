@@ -10,7 +10,7 @@ import { File } from '@netfeez/common-node';
 import { Logger } from "@netfeez/vterm";
 
 import Utils from '../Utils.js';
-import schemas from '../../config/schemas.js';
+import Schemas from '../../config/schemas.js';
 import PathRewriter from './PathRewriter.js';
 import AliasCompiler from './AliasCompiler.js';
 
@@ -24,7 +24,7 @@ export class PathResolver {
     public readonly aliases: AliasCompiler.CompiledAlias[];
 
     public constructor(
-        public readonly config: schemas.config['infer'],
+        public readonly config: Schemas.Config['infer'],
         public readonly options: PathResolver.Options = {},
     ) {
         this.logger = options.logger || new Logger({ name: 'PATH-RW' });

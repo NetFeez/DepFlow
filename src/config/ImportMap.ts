@@ -4,6 +4,7 @@ import { Logger } from '@netfeez/vterm';
 import { File, Path } from '@netfeez/common-node';
 
 import AliasCompiler from '../support/PathResolver/AliasCompiler.js';
+import Schemas from './schemas.js';
 
 export class ImportMap {
     protected logger: Logger;
@@ -34,8 +35,8 @@ export class ImportMap {
                 : aliasObj.targets.local;
 
             if (target === aliasObj.targets.local) {
-                target = PATH.relative(this.projectRoot, target);
-                if (!target.startsWith('./')) target = `./${target}`;
+                target = Path.diff(this.projectRoot, target);
+                target = target.startsWith('/') ? target : `/${target}`;
                 target = Path.normalize(target);
             }
             if (aliasObj.isWildcard) {
@@ -52,10 +53,10 @@ export class ImportMap {
         const logger = options.logger || new Logger({ name: 'IMP-MAP' });
         const importMapPath = PATH.resolve(projectRoot, filename);
         const folder = PATH.dirname(importMapPath);
-        if (!await File.exists(folder)) await File.mkdir(folder, { recursive: true });
+        await File.ensureDir(folder);
         const json = JSON.stringify(data, null, 4);
         await File.write(importMapPath, json);
-        logger.log(`&C2Generated &C4${filename}`);
+        logger.log(`&C2Saved file &C4${filename}`);
     }
     /**
      * Factory method: Loads, validates (or creates default), and returns an instance of the ImportMap class.
@@ -70,22 +71,20 @@ export class ImportMap {
     public static async load(projectRoot: string, filename: string, options: ImportMap.Options = {}): Promise<ImportMap> {
         const logger = options.logger || new Logger({ name: 'IMP-MAP' });
         const importMapPath = PATH.resolve(projectRoot, filename);
-        let data: ImportMap.Data = { imports: {} };
+        let data: ImportMap.Data;
         if (!await File.exists(importMapPath)) {
             logger.warn(`&C3${filename} not found. Creating defaults...`);
-            const data = { imports: {} };
-            await ImportMap.save(projectRoot, filename, data, { logger });
+            data = Schemas.ImportMap.processData({});
+            // await ImportMap.save(projectRoot, filename, data, { logger });
         } else {
             const content = await File.read(importMapPath, 'utf-8');
             const json = JSON.parse(content);
-            data = json;
+            data = Schemas.ImportMap.processData(json);
         } return new ImportMap(data, projectRoot, filename, { logger });
     }
 }
 export namespace ImportMap {
-    export interface Data {
-        imports: Record<string, string>;
-    }
+    export type Data = Schemas.ImportMap['infer'];
     export interface Options {
         logger?: Logger;
     }

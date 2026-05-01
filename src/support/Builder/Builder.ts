@@ -1,33 +1,39 @@
-import Logger from "@netfeez/vterm";
+import type Logger from "@netfeez/vterm";
 
-import schemas from "../../config/schemas.js";
+import type Schemas from "../../config/schemas.js";
+
+
 import Utils from "../Utils.js";
 import Async from "../Async.js";
 import Task from "../Task/Task.js";
 import { File, Path } from "@netfeez/common-node";
-import { promises } from "node:dns";
 
 export class Builder {
-    public constructor(
-        protected readonly pipeline: Builder.Pipeline,
-        protected readonly cwd: string,
-        protected readonly logger: Logger
-    ) {}
+    protected readonly pipeline: Builder.BuilderEntry[] = [];
+    protected readonly cwd: string = process.cwd();
+    protected readonly logger: Logger | null;
+
+    public constructor(info: Builder.Info) {
+        this.pipeline = info.pipeline;
+        this.cwd = info.cwd;
+        this.logger = info.logger || null;
+    }
+    
     public async run(): Promise<void> {
-        if (this.logger) this.logger.group(Utils.newGroup('#00FFB4'));
+        this.logger?.group(Utils.newGroup('#00FFB4'));
         for (const step of this.pipeline) {
             let ranTask = false;
             if (step.run) try {
                 const commands = typeof step.run === 'string' ? [ step.run ] : step.run;
                 await this.runTask(commands, this.cwd, step.maxTimeMs ?? 60000);
-            } catch (error) { if (this.logger) this.logger.error(`&C1[Run] &C7${error}`); }
+            } catch (error) { this.logger?.error(`&C1[Run] &C7${error}`); }
             finally { ranTask = true; }
             if (step.extract) try {
-                if (this.logger && ranTask) this.logger.line();
+                if (ranTask) this.logger?.line();
                 await this.runExtractor(step.extract);
-            } catch (error) { if (this.logger) this.logger.error(`&C1[Extract] &C7${error}`); }
+            } catch (error) { this.logger?.error(`&C1[Extract] &C7${error}`); }
         }
-        if (this.logger) this.logger.groupEnd();
+        this.logger?.groupEnd();
     }
     /**
      * Runs the extraction process based on the provided entry configuration, which can be either a string or an array of extraction entries.
@@ -47,7 +53,7 @@ export class Builder {
             const value = !replacer || typeof replacer === 'string' ? '' : replacer.replace;
 
             const to = Path.isAbsolute(toEntry) ? toEntry : Path.join(Path.cwd, toEntry);
-            if (this.logger) this.logger.log(`&C7Extracting &C3${from}&C7 to &C3${to}&C7...`);
+            this.logger?.log(`&C7Extracting &C3${from}&C7 to &C3${to}&C7...`);
             await File.smartCopy(from, to, {
                 cwd: this.cwd,
                 map: path => regex ? path.replace(regex, value) : path
@@ -65,8 +71,8 @@ export class Builder {
         return Async.awaitEvent<void>((done, fail) => {
             const pollito = new Task(cwd, commands);
             if (this.logger) {
-                pollito.on('line', (line) => this.logger.info(`${line}`));
-                pollito.on('error', (msg, step) => this.logger.error(`&C1[Step ${step}]&C7: &C1${msg}`));
+                pollito.on('line', (line) => this.logger?.info(`${line}`));
+                pollito.on('error', (msg, step) => this.logger?.error(`&C1[Step ${step}]&C7: &C1${msg}`));
             }
             pollito.once('finish', (data) => {
                 if (data.fails > 0) fail(new Error(`Build failed with ${data.fails} failed steps.`));
@@ -78,7 +84,12 @@ export class Builder {
     }
 }
 export namespace Builder {
-    export type Pipeline = schemas.dependency['infer']['builder']
-    export type Extractor = schemas.extractor['infer'];
+    export type BuilderEntry = Schemas.BuilderEntry['infer'];
+    export type Extractor = Schemas.ExtractorEntry['infer'];
+    export interface Info {
+        pipeline: BuilderEntry[];
+        cwd: string;
+        logger?: Logger | null;
+    }
 }
 export default Builder;
