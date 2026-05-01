@@ -1,7 +1,7 @@
 {
   "name": "depflow",
   "description": "is a simple dependency manager based on github repositories",
-  "version": "2.0.2",
+  "version": "3.0.0",
   "main": "build/bin/bin.js",
   "type": "module",
   "bin": {
@@ -34,7 +34,7 @@
   ],
   "dependencies": {
     "@netfeez/common": "^3.0.0",
-    "@netfeez/common-node": "^1.0.1",
+    "@netfeez/common-node": "^3.0.0",
     "@netfeez/vterm": "^1.1.0"
   },
   "devDependencies": {
