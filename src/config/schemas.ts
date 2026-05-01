@@ -14,12 +14,19 @@ export const basicTsconfig = Schema.fromObject({
     }, allowAdditionalProperties: true },
 }, true);
 
-let test = basicTsconfig.infer
+export const extractEntry = Schema.fromObject({
+    from: { type: 'string', required: true },
+    to: { type: 'string', required: true },
+    replacer: { union: [ { type: 'string' }, { type: 'object', properties: {
+        search: { type: 'string', required: true },
+        replace: { type: 'string', required: true }
+    } } ], nullable: true }
+});
 
 export const builder = Schema.fromObject({
     maxTimeMs: { type: 'number', default: 60000 },
     run: {  union: [ { type: 'string' },  { type: 'array', items: { type: 'string' } } ]  },
-    move: {  union: [ { type: 'string' },  { type: 'object' } ]  }
+    extract: {  union: [ { type: 'string' }, { type: 'array', items: extractEntry.root } ]  }
 });
 
 export const pathResolverEntry = Schema.fromObject({
@@ -62,6 +69,7 @@ export namespace schemas {
     export type pathResolverEntry = typeof pathResolverEntry;
     export type dependency = typeof dependency;
     export type basicTsconfig = typeof basicTsconfig;
+    export type extractor = typeof extractEntry;
 }
 
 export default schemas;
