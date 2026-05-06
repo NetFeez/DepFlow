@@ -29,7 +29,7 @@ export class PathResolver {
     ) {
         this.logger = options.logger || new Logger({ name: 'PATH-RW' });
         
-        const outDir = config.outDir || '.';
+        const outDir = config.outDir || 'build';
         this.absoluteOutDir = !PATH.isAbsolute(outDir)
             ? PATH.resolve(PathResolver.PROJECT_ROOT, outDir)
             : outDir;
@@ -43,7 +43,7 @@ export class PathResolver {
      * @param mode The resolution mode ('local' or 'cdn') to determine which target paths to use.
      */
     public async rewritePaths(mode: PathResolver.Mode): Promise<void> {
-        this.logger.log(`&C2Starting path resolver in &C3${mode} &C2mode...`);
+        this.logger.log(`&C2Starting path resolver in &C3${mode} &C2mode for ${this.absoluteOutDir}...`);
         
         if (!await File.exists(this.absoluteOutDir)) return void this.logger.warn(`Directory &C4${this.absoluteOutDir}&R not found.`);
 
