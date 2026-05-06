@@ -1,9 +1,7 @@
-import { ChildProcessWithoutNullStreams } from "node:child_process";
-
+import { Async } from "@netfeez/common-node";
 import { Events } from "@netfeez/common";
 
 import Command from "./Command.js";
-import Async from "../Async.js";
 
 export class Task extends Events<Task.EventMap> implements Task.FinishData {
     protected vResults: Task.commandResult[] = [];

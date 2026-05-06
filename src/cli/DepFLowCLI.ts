@@ -180,6 +180,7 @@ export class DepFlowCLI extends DebugUI {
             const watch = args.includes('--watch') || args.includes('-w');
             const useCDN = args.includes('--cdn');
             const mode: PathResolver.Mode = useCDN ? 'cdn' : 'local';
+            const dir = config.outDir;
 
             this.out.info(`Mode: &C3${useCDN ? 'CDN' : 'Local'}`);
             if (watch) this.out.info(`Watcher: &C2Enabled`);

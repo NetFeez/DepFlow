@@ -3,16 +3,17 @@
  * @description Utility for path resolution with Local/CDN support and dual path fixing.
  * @license Apache-2.0
  */
-import PATH from "node:path";
 import FS, { promises as FSP } from 'node:fs';
 
-import { File } from '@netfeez/common-node';
+import { File, Path } from '@netfeez/common-node';
 import { Logger } from "@netfeez/vterm";
 
 import Utils from '../Utils.js';
 import Schemas from '../../config/schemas.js';
 import PathRewriter from './PathRewriter.js';
 import AliasCompiler from './AliasCompiler.js';
+import Glob from "@netfeez/common-node/Glob";
+import Async from "@netfeez/common-node/Async";
 
 export class PathResolver {
     public static readonly PROJECT_ROOT = process.cwd();
@@ -20,7 +21,7 @@ export class PathResolver {
 
     protected readonly logger: Logger;
     protected readonly rewriter: PathRewriter;
-    protected readonly absoluteOutDir: string;
+    protected readonly outDir: string;
     public readonly aliases: AliasCompiler.CompiledAlias[];
 
     public constructor(
@@ -30,8 +31,8 @@ export class PathResolver {
         this.logger = options.logger || new Logger({ name: 'PATH-RW' });
         
         const outDir = config.outDir || 'build';
-        this.absoluteOutDir = !PATH.isAbsolute(outDir)
-            ? PATH.resolve(PathResolver.PROJECT_ROOT, outDir)
+        this.outDir = !Path.isAbsolute(outDir)
+            ? Path.resolve(PathResolver.PROJECT_ROOT, outDir)
             : outDir;
 
         this.aliases = new AliasCompiler(PathResolver.PROJECT_ROOT).compile(config);
@@ -43,21 +44,22 @@ export class PathResolver {
      * @param mode The resolution mode ('local' or 'cdn') to determine which target paths to use.
      */
     public async rewritePaths(mode: PathResolver.Mode): Promise<void> {
-        this.logger.log(`&C2Starting path resolver in &C3${mode} &C2mode for ${this.absoluteOutDir}...`);
+        this.logger.log(`&C2Starting path resolver in &C3${mode} &C2mode for ${this.outDir}...`);
         
-        if (!await File.exists(this.absoluteOutDir)) return void this.logger.warn(`Directory &C4${this.absoluteOutDir}&R not found.`);
+        if (!await File.exists(this.outDir)) return void this.logger.warn(`Directory &C4${this.outDir}&R not found.`);
 
-        // const files = await File.getAllFiles(this.absoluteOutDir, PathResolver.EXTENSIONS);
-        const files = [];
-        files.push(...await File.find('**/*.js'));
-        files.push(...await File.find('**/*.ts'));
-        files.push(...await File.find('**/*.jsx'));
-        files.push(...await File.find('**/*.tsx'));
+        const filter = '**/*.{js,ts,jsx,tsx,{c,m}js}';
+        const files: string[] = await File.find(filter, this.outDir);
 
         let rewrittenCount = 0;
-        for (const file of files) {
-            if (await this.processFile(file, mode)) rewrittenCount++;
-        }
+        const limiter = Async.currencyLimiter(16);
+        const promises = files.map((file) => {
+            file = Path.join(this.outDir, file);
+            return limiter(() => this.processFile(file, mode).then(changed => {
+                if (changed) rewrittenCount++;
+            }));
+        });
+        await Promise.all(promises);
         this.logger.log(`&C2Path aliases resolved in &C3${rewrittenCount} &C2files.`);
     }
     /**
@@ -91,7 +93,7 @@ export class PathResolver {
      */
     public async watch(mode: PathResolver.Mode): Promise<void> {
         await this.rewritePaths(mode);
-        this.logger.log(`&C2Watching for changes in &C4${this.absoluteOutDir}...`);
+        this.logger.log(`&C2Watching for changes in &C4${this.outDir}...`);
 
         const debouncedProcessor = Utils.debounce(async (fullPath: string, filename: string) => {
             if (await this.processFile(fullPath, mode)) {
@@ -99,13 +101,13 @@ export class PathResolver {
             }
         }, 300);
 
-        FS.watch(this.absoluteOutDir, { recursive: true }, (eventType, filename) => {
+        FS.watch(this.outDir, { recursive: true }, (eventType, filename) => {
             if (!filename) return;
             
             const isTargetExtension = PathResolver.EXTENSIONS.some(ext => filename.endsWith(ext));
             if (!isTargetExtension) return;
 
-            const fullPath = PATH.join(this.absoluteOutDir, filename);
+            const fullPath = Path.join(this.outDir, filename);
             debouncedProcessor(fullPath, filename);
         });
     }

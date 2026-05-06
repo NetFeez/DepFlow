@@ -1,5 +1,6 @@
+import { Async } from "@netfeez/common-node";
+
 import Task from "./Task/Task.js";
-import Async from "./Async.js";
 import Logger from "@netfeez/vterm";
 
 export class Git {
