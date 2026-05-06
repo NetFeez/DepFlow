@@ -14,38 +14,53 @@ export class AliasCompiler {
      */
     public compile(config: Schemas.Config['infer']): AliasCompiler.CompiledAlias[] {
         const result: AliasCompiler.CompiledAlias[] = [];
-        const allDeps = [...(config.dependencies || []), ...(config.npmDependencies || [])];
-
+        const allDeps = [
+            ...(config.dependencies || []),
+            ...(config.npmDependencies || [])
+        ];
+        const baseResolvers = config.resolver || [];
         for (const dep of allDeps) {
             if (typeof dep !== 'object' || !dep.resolver) continue;
+            result.push(...this.resolve(dep.resolver));
+        }
+        result.push(...this.resolve(baseResolvers));
+        return result;
+    }
+    /**
+     * Resolves an array of resolver entries into compiled alias objects, handling both string and object target formats.
+     * It determines if each alias is a wildcard and resolves local paths to absolute paths based on the project root.
+     * The method also extracts type and CDN targets if provided in the resolver entry.
+     * @param resolver An array of resolver entries to process into compiled aliases.
+     * @returns An array of compiled alias objects derived from the resolver entries.
+     */
+    protected resolve(resolver: AliasCompiler.Resolver[]): AliasCompiler.CompiledAlias[] {
+        const result: AliasCompiler.CompiledAlias[] = [];
+        for (const entry of resolver) {
+            const isWildcard = Utils.isWildcard(entry.alias);
+            const alias = Utils.removeWildcardSuffix(entry.alias);
 
-            for (const entry of dep.resolver) {
-                const isWildcard = Utils.isWildcard(entry.alias);
-                const alias = Utils.removeWildcardSuffix(entry.alias);
+            const rawLocal = typeof entry.target === 'string' ? entry.target : entry.target.local;
+            const localTarget = path.isAbsolute(rawLocal) 
+                ? Utils.removeWildcardSuffix(rawLocal)
+                : path.resolve(this.projectRoot, Utils.removeWildcardSuffix(rawLocal));
 
-                const rawLocal = typeof entry.target === 'string' ? entry.target : entry.target.local;
-                const localTarget = path.isAbsolute(rawLocal) 
-                    ? Utils.removeWildcardSuffix(rawLocal)
-                    : path.resolve(this.projectRoot, Utils.removeWildcardSuffix(rawLocal));
-
-                let cdnTarget: string | undefined;
-                let typeTarget: string | undefined;
-                if (typeof entry.target === 'object') {
-                    if (entry.target.type) {
-                        typeTarget = Utils.removeWildcardSuffix(entry.target.type);
-                    }
-                    if (entry.target.cdn) {
-                        cdnTarget = Utils.removeWildcardSuffix(entry.target.cdn);
-                    }
+            let cdnTarget: string | undefined;
+            let typeTarget: string | undefined;
+            if (typeof entry.target === 'object') {
+                if (entry.target.type) {
+                    typeTarget = Utils.removeWildcardSuffix(entry.target.type);
                 }
-
-                result.push({ alias, isWildcard, targets: { local: localTarget, type: typeTarget, cdn: cdnTarget } });
+                if (entry.target.cdn) {
+                    cdnTarget = Utils.removeWildcardSuffix(entry.target.cdn);
+                }
             }
+            result.push({ alias, isWildcard, targets: { local: localTarget, type: typeTarget, cdn: cdnTarget } });
         }
         return result;
     }
 }
 export namespace AliasCompiler {
+    export type Resolver = Schemas.ResolverEntry['infer'];
     export interface Target {
         local: string;
         type?: string;

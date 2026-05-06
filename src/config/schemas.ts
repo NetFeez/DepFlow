@@ -1,9 +1,8 @@
 import { Schema } from '@netfeez/common';
-import { version } from 'node:os';
 
 export const ImportMap = Schema.fromObject({
-    imports: { type: 'object', default: {} },
-    scopes: { type: 'object', default: {} }
+    imports: { type: 'object', allowAdditionalProperties: true, default: {} },
+    scopes: { type: 'object', allowAdditionalProperties: true, default: {} }
 });
 
 export const TsConfig = Schema.fromObject({
@@ -11,14 +10,14 @@ export const TsConfig = Schema.fromObject({
         baseUrl: { type: 'string' },
         rootDir: { type: 'string' },
         outDir: { type: 'string' },
-        paths: { type: 'object' }
+        paths: { type: 'object', allowAdditionalProperties: { type: 'array', items: { type: 'string' } } }
     }, allowAdditionalProperties: true }
 }, true);
 
 export const ExtractorEntry = Schema.fromObject({
     from: { type: 'string', required: true },
     to: { type: 'string', required: true },
-    replacer: { union: [ { type: 'string' }, { type: 'object', properties: {
+    replacer: { type: 'union', union: [ { type: 'string' }, { type: 'object', properties: {
         search: { type: 'string', required: true },
         replace: { type: 'string', required: true }
     } } ], nullable: true }
@@ -26,13 +25,13 @@ export const ExtractorEntry = Schema.fromObject({
 
 export const BuilderEntry = Schema.fromObject({
     maxTimeMs: { type: 'number', default: 60000 },
-    run: {  union: [ { type: 'string' },  { type: 'array', items: { type: 'string' } } ]  },
-    extract: {  union: [ { type: 'string' }, { type: 'array', items: ExtractorEntry.root } ]  }
+    run: { type: 'union', union: [ { type: 'string' },  { type: 'array', items: { type: 'string' } } ]  },
+    extract: { type: 'union', union: [ { type: 'string' }, { type: 'array', items: ExtractorEntry.root } ]  }
 });
 
 export const ResolverEntry = Schema.fromObject({
     alias: { type: 'string', required: true },
-    target: { union: [
+    target: { type: 'union', union: [
         { type: 'string' },
         { type: 'object', properties: {
             local: { type: 'string', required: true },
@@ -63,6 +62,8 @@ export const Config = Schema.fromObject({
     outDir: { type: 'string', default: 'dist' },
     tsconfig: { type: 'string', nullable: true, default: null },
     importmap: { type: 'string', nullable: true, default: null },
+    actions: { type: 'object', allowAdditionalProperties: { type: 'array', items: BuilderEntry.root }, default: {} },
+    resolver: { type: 'array', default: [], items: ResolverEntry.root },
     dependencies: {  type: 'array',  default: [],  items: GitDependency.root },
     npmDependencies: { type: 'array', default: [], items: NpmDependency.root }
 });

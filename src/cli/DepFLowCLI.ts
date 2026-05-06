@@ -11,6 +11,7 @@ import Schemas from "../config/schemas.js";
 import Tsconfig from "../config/Tsconfig.js";
 import ImportMap from "../config/ImportMap.js";
 import NpmDependency from "../support/Dependency/NpmDependency.js";
+import Builder from "../support/Builder/Builder.js";
 
 export class DepFlowCLI extends DebugUI {
     protected readonly projectRoot: string;
@@ -29,6 +30,7 @@ export class DepFlowCLI extends DebugUI {
         this.addCommand('remove', this.commandRemove, { usage: 'dep remove <name> | <repo_url>', description: 'Remove a dependency from the configuration file by name or repo URL.' });
         this.addCommand('install', this.commandInstall, { usage: 'dep install [name1 name2 ...]', description: 'Install dependencies. If names are provided, only those dependencies will be installed.' });
         this.addCommand('uninstall', this.uninstall, { usage: 'dep uninstall [name1 name2 ...]', description: 'Uninstall dependencies. If names are provided, only those dependencies will be uninstalled.' });
+        this.addCommand('run', this.commandRun, { usage: 'dep run <script>', description: 'Run a custom action defined in the configuration file.' });
         this.addCommand('list', this.list, { usage: 'dep list', description: 'List all dependencies in the configuration file.' });
         this.addCommand('rewrite-paths', this.rewritePaths, { usage: 'dep rewrite-paths [--watch] [--cdn]', description: 'Resolve and rewrite paths in built files based on depFlow configuration.' });
         this.addCommand('sync', this.commandSync, { usage: 'dep sync', description: 'Syncs depFlow.json with tsconfig.json and generates the importmap.'  });
@@ -132,6 +134,29 @@ export class DepFlowCLI extends DebugUI {
                     this.out.groupEnd();
                 } finally { this.out.groupEnd(); }
             }
+        } catch (error) { this.out.error(`&C1${error}`); }
+        finally { this.out.groupEnd(); }
+    }
+    public async commandRun(command: string, args: string[]) {
+        try {
+            const [actionName] = args;
+            if (!actionName) throw new Error('Usage: dep run <action>');
+
+            this.out.group(Utils.newGroup('#FFB4DC'));
+            this.out.info(`&C5Running action &C6${actionName}&C5...`);
+
+            const config = await Config.load(this.configPath);
+            const action = config.actions[actionName];
+            if (!action) throw new Error(`action "${actionName}" not found in configuration.`);
+
+            const pipeline = Array.isArray(action) ? action : [action];
+
+            const builder = new Builder({
+                cwd: this.projectRoot,
+                pipeline,
+                logger: this.out
+            });
+            await builder.run();
         } catch (error) { this.out.error(`&C1${error}`); }
         finally { this.out.groupEnd(); }
     }
