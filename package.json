@@ -1,7 +1,7 @@
 {
   "name": "depflow",
   "description": "is a simple dependency manager based on github repositories",
-  "version": "3.0.0-dev.2",
+  "version": "3.0.0-dev.3",
   "main": "build/bin/bin.js",
   "type": "module",
   "bin": {
@@ -9,13 +9,12 @@
   },
   "scripts": {
     "dev": "npx tsc --watch",
-    "compile": "npx tsc",
-    "prepare": "npm run compile"
+    "build": "bash ./scripts/build.sh",
+    "prepare": "npm run build"
   },
   "license": "Apache-2.0",
   "repository": {
-    "type": "git",
-    "url": "https://github.com/NetFeez/DependencyManager.git"
+    "url": "git+https://github.com/NetFeez/depflow.git"
   },
   "author": {
     "name": "NetFeez",
@@ -33,7 +32,7 @@
     "README.md"
   ],
   "dependencies": {
-    "@netfeez/common": "^3.0.0",
+    "@netfeez/common": "^3.2.0",
     "@netfeez/common-node": "^3.0.0",
     "@netfeez/vterm": "^1.1.0"
   },
