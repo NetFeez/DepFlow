@@ -14,13 +14,20 @@ export const TsConfig = Schema.fromObject({
     }, allowAdditionalProperties: true }
 }, true);
 
+export const Replacer = new Schema({ type: 'union', union: [
+    { type: 'string' },
+    { type: 'object', properties: {
+        search: { type: 'string', required: true },
+        flags: { type: 'string', default: '' },
+        replace: { type: 'string', required: true }
+    } }
+], nullable: true });
+
 export const ExtractorEntry = Schema.fromObject({
     from: { type: 'string', required: true },
     to: { type: 'string', required: true },
-    replacer: { type: 'union', union: [ { type: 'string' }, { type: 'object', properties: {
-        search: { type: 'string', required: true },
-        replace: { type: 'string', required: true }
-    } } ], nullable: true }
+    pathReplacer: Replacer.root,
+    replacer: Replacer.root
 });
 
 export const BuilderEntry = Schema.fromObject({
@@ -80,6 +87,7 @@ export namespace Schemas {
     export type ResolverEntry = typeof ResolverEntry;
     export type GitDependency = typeof GitDependency;
     export type NpmDependency = typeof NpmDependency;
+    export type Replacer = typeof Replacer;
     export type TsConfig = typeof TsConfig;
     export type ImportMap = typeof ImportMap;
     export type ExtractorEntry = typeof ExtractorEntry;
