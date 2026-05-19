@@ -23,7 +23,7 @@ export const Transform = new Schema({ type: 'union', union: [
     } }
 ]});
 
-export const GlobalTransform = new Schema({ type: 'object', properties: {
+export const GlobalTransform = new Schema({ type: 'object', required: true, properties: {
     glob: { type: 'string', required: true },
     search: { type: 'string', required: true },
     flags: { type: 'string', default: 'g', pattern: /^[gimsuy]*$/ },
