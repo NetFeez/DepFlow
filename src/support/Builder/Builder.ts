@@ -17,22 +17,35 @@ export class Builder {
         this.cwd = info.cwd;
         this.logger = info.logger || null;
     }
-    
     public async run(): Promise<void> {
         this.logger?.group(Utils.newGroup('#00FFB4'));
+        
         for (const step of this.pipeline) {
-            let ranTask = false;
-            if (step.run) try {
+            if ('run' in step && step.run) {
                 const commands = typeof step.run === 'string' ? [ step.run ] : step.run;
                 await this.runTask(commands, this.cwd, step.maxTimeMs ?? 60000);
-            } catch (error) { this.logger?.error(`&C1[Run] &C7${error}`); }
-            finally { ranTask = true; }
-            if (step.extract) try {
-                if (ranTask) this.logger?.line();
+            }
+            if ('extract' in step && step.extract) {
                 await this.runExtractor(step.extract);
-            } catch (error) { this.logger?.error(`&C1[Extract] &C7${error}`); }
+            }
+            if ( 'transform' in step && step.transform) {
+                await this.runGlobalTransform(step.transform);
+            }
         }
         this.logger?.groupEnd();
+    }
+    protected async runGlobalTransform(options: Schemas.GlobalTransform['infer']): Promise<void> {
+        this.logger?.log(`&C7Applying global transformation in &C3${this.cwd}&C7...`);
+        const transformAction = Builder.replacer(options);
+        const glob = options.glob;
+
+        await File.smartProcess('glob', this.cwd, {
+            cwd: this.cwd,
+        }, async ({ src, dest }) => {
+            const content = await File.read(src);
+            const transformedContent = transformAction(content);
+            await File.write(dest, transformedContent);
+        });
     }
     /**
      * Runs the extraction process based on the provided entry configuration, which can be either a string or an array of extraction entries.
@@ -46,20 +59,21 @@ export class Builder {
         const extractor = typeof entry === 'string' ? [ { from: '**/*', to: entry } ] : entry;
 
         for (const entry of extractor) {
-            const { from, to: toEntry, pathReplacer, replacer } = entry;
+            const { from, to: toEntry, pathReplacer, transform } = entry;
 
             const pathReplacerAction = Builder.replacer(pathReplacer);
-            const replacerAction = Builder.replacer(replacer);
+            const replacerAction = Builder.replacer(transform);
 
             const to = Path.isAbsolute(toEntry) ? toEntry : Path.join(Path.cwd, toEntry);
             this.logger?.log(`&C7Extracting &C3${from}&C7 to &C3${to}&C7...`);
+            
             await File.smartProcess(from, to, {
                 cwd: this.cwd,
                 map: pathReplacerAction,
             }, async ({ src, dest }) => {
                 const content = await File.read(src);
                 const transformedContent = replacerAction(content);
-                File.write(dest, transformedContent);
+                await File.write(dest, transformedContent);
             });
         }
     }
@@ -91,7 +105,7 @@ export class Builder {
      * @returns A function that takes a string as input and returns a new string with the specified replacements applied, based on the provided replacer configuration.
      * @throws Will throw an error if the provided replacer configuration is invalid, such as if it is neither a string nor an object with the required properties.
      */
-    protected static replacer(replacer: Schemas.Replacer['infer']): Builder.ReplacerAction {
+    protected static replacer(replacer: Schemas.Transform['infer']): Builder.ReplacerAction {
         if (typeof replacer === 'string') {
             return (str) => str.replace(new RegExp(replacer, 'g'), '');
         } else if (replacer !== null && typeof replacer === 'object') {
@@ -103,7 +117,7 @@ export class Builder {
     }
 }
 export namespace Builder {
-    export type Replacer = Schemas.Replacer['infer'];
+    export type Replacer = Schemas.Transform['infer'];
     export type ReplacerAction = (str: string) => string;
     export type BuilderEntry = Schemas.BuilderEntry['infer'];
     export type Extractor = Schemas.ExtractorEntry['infer'];

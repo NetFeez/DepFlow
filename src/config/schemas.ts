@@ -14,27 +14,44 @@ export const TsConfig = Schema.fromObject({
     }, allowAdditionalProperties: true }
 }, true);
 
-export const Replacer = new Schema({ type: 'union', union: [
+export const Transform = new Schema({ type: 'union', union: [
     { type: 'string' },
     { type: 'object', properties: {
         search: { type: 'string', required: true },
-        flags: { type: 'string', default: '' },
+        flags: { type: 'string', default: 'g', pattern: /^[gimsuy]*$/ },
         replace: { type: 'string', required: true }
     } }
-], nullable: true });
+]});
+
+export const GlobalTransform = new Schema({ type: 'object', properties: {
+    glob: { type: 'string', required: true },
+    search: { type: 'string', required: true },
+    flags: { type: 'string', default: 'g', pattern: /^[gimsuy]*$/ },
+    replace: { type: 'string', required: true }
+}});
 
 export const ExtractorEntry = Schema.fromObject({
     from: { type: 'string', required: true },
     to: { type: 'string', required: true },
-    pathReplacer: Replacer.root,
-    replacer: Replacer.root
+    pathReplacer: Transform.root,
+    transform: Transform.root
 });
 
-export const BuilderEntry = Schema.fromObject({
-    maxTimeMs: { type: 'number', default: 60000 },
-    run: { type: 'union', union: [ { type: 'string' },  { type: 'array', items: { type: 'string' } } ]  },
-    extract: { type: 'union', union: [ { type: 'string' }, { type: 'array', items: ExtractorEntry.root } ]  }
-});
+export const BuilderEntry = new Schema({ type: 'union', required: true, union: [
+    { type: 'object', properties: {
+        maxTimeMs: { type: 'number', default: 60000, minimum: -1 },
+        allowFails: { type: 'boolean', default: false },
+        run: { type: 'union', required: true, union: [ { type: 'string' },  { type: 'array', items: { type: 'string' } } ]  }
+    } },
+    { type: 'object', properties: {
+        extract: { type: 'union', required: true, union: [ { type: 'string' }, { type: 'array', items: ExtractorEntry.root } ]  }
+    } },
+    { type: 'object', properties: {
+        transform: GlobalTransform.root
+    } }
+]});
+
+export const Builder = new Schema({ type: 'array', default: [], items: BuilderEntry.root });
 
 export const ResolverEntry = Schema.fromObject({
     alias: { type: 'string', required: true },
@@ -52,14 +69,14 @@ export const GitDependency = Schema.fromObject({
     name: { type: 'string', required: true },
     repo: { type: 'string', required: true },
     tag: { type: 'string', default: 'main' },
-    builder: { type: 'array', default: [], items: BuilderEntry.root },
+    builder: Builder.root,
     resolver: { type: 'array', nullable: true, default: [], items: ResolverEntry.root }
 });
 
 export const NpmDependency = Schema.fromObject({
     name: { type: 'string', required: true },
     version: { type: 'string', required: true },
-    builder: { type: 'array', default: [], items: BuilderEntry.root },
+    builder: Builder.root,
     resolver: { type: 'array', nullable: true, default: [], items: ResolverEntry.root }
 });
 
@@ -69,7 +86,7 @@ export const Config = Schema.fromObject({
     outDir: { type: 'string', default: 'dist' },
     tsconfig: { type: 'string', nullable: true, default: null },
     importmap: { type: 'string', nullable: true, default: null },
-    actions: { type: 'object', allowAdditionalProperties: { type: 'array', items: BuilderEntry.root }, default: {} },
+    actions: { type: 'object', allowAdditionalProperties: Builder.root, default: {} },
     resolver: { type: 'array', default: [], items: ResolverEntry.root },
     dependencies: {  type: 'array',  default: [],  items: GitDependency.root },
     npmDependencies: { type: 'array', default: [], items: NpmDependency.root }
@@ -78,19 +95,21 @@ export const Config = Schema.fromObject({
 export const Schemas = {
     Config,
     TsConfig, ImportMap,
-    BuilderEntry, ResolverEntry,
+    Builder, BuilderEntry, ResolverEntry,
     GitDependency, NpmDependency
 };
 export namespace Schemas {
-    export type Config = typeof Config;
+    export type Builder = typeof Builder;
     export type BuilderEntry = typeof BuilderEntry;
-    export type ResolverEntry = typeof ResolverEntry;
-    export type GitDependency = typeof GitDependency;
-    export type NpmDependency = typeof NpmDependency;
-    export type Replacer = typeof Replacer;
-    export type TsConfig = typeof TsConfig;
-    export type ImportMap = typeof ImportMap;
+    export type Config = typeof Config;
     export type ExtractorEntry = typeof ExtractorEntry;
+    export type GitDependency = typeof GitDependency;
+    export type GlobalTransform = typeof GlobalTransform;
+    export type ImportMap = typeof ImportMap;
+    export type NpmDependency = typeof NpmDependency;
+    export type ResolverEntry = typeof ResolverEntry;
+    export type Transform = typeof Transform;
+    export type TsConfig = typeof TsConfig;
 }
 
 export default Schemas;
