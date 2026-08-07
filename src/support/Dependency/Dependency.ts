@@ -1,6 +1,6 @@
 import type Logger from "@netfeez/vterm";
 
-import type Resolver from "./Resolver.js";
+import type AliasCompiler from "../PathResolver/AliasCompiler.js";
 import type Builder from "../Builder/Builder.js";
 
 export abstract class Dependency {
@@ -8,12 +8,12 @@ export abstract class Dependency {
 
     public readonly name: string;
     public readonly builder: Builder.Builder;
-    public readonly resolver: Resolver.ResolverEntry[];
+    public readonly resolver: AliasCompiler.Resolver;
 
     public constructor(info: Dependency.Info, logger?: Logger | null) {
         this.name = info.name;
         this.builder = info.builder || [];
-        this.resolver = info.resolver || [];
+        this.resolver = info.resolver || {};
         this.logger = logger || null;
     }
     /**
@@ -41,7 +41,7 @@ export namespace Dependency {
     export interface Info {
         name: string;
         builder?: Builder.Builder;
-        resolver?: Resolver.ResolverEntry[];
+        resolver?: AliasCompiler.Resolver;
     }
 }
 export default Dependency;

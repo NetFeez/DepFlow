@@ -24,7 +24,7 @@ export class GitDependency extends Dependency implements GitDependency.Dependenc
     ) { super({
             name: dependency.name,
             builder: dependency.builder,
-            resolver: dependency.resolver || []
+            resolver: dependency.resolver || {}
         }, logger);
         Validator.validateRepo(dependency.repo);
         this.repo = dependency.repo;
