@@ -1,18 +1,15 @@
-import PATH from 'node:path';
-
 import { Logger } from '@netfeez/vterm';
 import { File, Path } from '@netfeez/common-node';
 
 import AliasCompiler from '../support/PathResolver/AliasCompiler.js';
-import Schemas from './schemas.js';
+import schema from './schema/schema.js';
 
 export class ImportMap {
     protected logger: Logger;
 
     constructor(
         protected data: ImportMap.Data,
-        protected projectRoot: string,
-        protected filename: string,
+        protected path: string,
         options: ImportMap.Options = {}
     ) { 
         this.logger = options.logger || new Logger({ name: 'IMP-MAP' }); 
@@ -27,6 +24,8 @@ export class ImportMap {
     public updateImports(aliases: AliasCompiler.CompiledAlias[], mode: 'local' | 'cdn'): void {
         if (!this.data.imports) this.data.imports = {};
 
+        const projectRoot = Path.dirname(this.path);
+
         for (const aliasObj of aliases) {
             const key = aliasObj.isWildcard ? `${aliasObj.alias}/` : aliasObj.alias;
 
@@ -35,7 +34,7 @@ export class ImportMap {
                 : aliasObj.targets.local;
 
             if (target === aliasObj.targets.local) {
-                target = Path.diff(this.projectRoot, target);
+                target = Path.diff(projectRoot, target);
                 target = target.startsWith('/') ? target : `/${target}`;
                 target = Path.normalize(target);
             }
@@ -46,16 +45,33 @@ export class ImportMap {
             this.data.imports[key] = target;
         }
     }
-    public async save(filename: string = this.filename): Promise<void> {
-        await ImportMap.save(this.projectRoot, filename, this.data, { logger: this.logger });
+    /**
+     * Saves the provided import map data to a specified file path.
+     * It ensures that the directory for the file exists, converts the data to a JSON string with proper formatting, and writes it to the file system.
+     * The method also includes logging to inform users when the save operation is successful.
+     * @param path The path to the import map file to save.
+     * @returns A promise that resolves when the save operation is complete, or rejects if an error occurs during the process.
+     */
+    public async save(path: string = this.path): Promise<void> {
+        await ImportMap.save(path, this.data, { logger: this.logger });
+        if (path !== this.path) this.path = path;
     }
-    public static async save(projectRoot: string, filename: string, data: ImportMap.Data, options: ImportMap.Options = {}): Promise<void> {
+    /**
+     * Saves the provided import map data to a specified file path.
+     * It ensures that the directory for the file exists, converts the data to a JSON string with proper formatting, and writes it to the file system.
+     * The method also includes logging to inform users when the save operation is successful.
+     * @param path The path to the import map file to save.
+     * @param data The import map data to be saved.
+     * @param options Additional options for saving, such as a logger for logging messages during the save process.
+     * @returns A promise that resolves when the save operation is complete, or rejects if an error occurs during the process.
+     */
+    public static async save(path: string, data: ImportMap.Data, options: ImportMap.Options = {}): Promise<void> {
         const logger = options.logger || new Logger({ name: 'IMP-MAP' });
-        const importMapPath = PATH.resolve(projectRoot, filename);
-        const folder = PATH.dirname(importMapPath);
+        const folder = Path.dirname(path);
         await File.ensureDir(folder);
         const json = JSON.stringify(data, null, 4);
-        await File.write(importMapPath, json);
+        await File.write(path, json);
+        const filename = Path.fileName(path);
         logger.log(`&C2Saved file &C4${filename}`);
     }
     /**
@@ -63,28 +79,27 @@ export class ImportMap {
      * It checks if the specified import map file exists, and if it does, it attempts to read and parse its content as JSON.
      * If the file does not exist or contains invalid JSON, it initializes the data with a default structure containing an empty "imports" object.
      * Finally, it returns a new instance of ImportMap with the loaded or default data, allowing for further manipulation and saving of the import map configuration.
-     * @param projectRoot The root directory of the project where the import map file is located.
-     * @param filename The name of the import map file to load (e.g., 'import-map.json').
+     * @param path The path to the import map file to load.
      * @param options Additional options for loading, such as a logger for logging messages during the load process.
      * @returns A promise that resolves to an instance of ImportMap initialized with the loaded or default data.
      */
-    public static async load(projectRoot: string, filename: string, options: ImportMap.Options = {}): Promise<ImportMap> {
+    public static async load(path: string, options: ImportMap.Options = {}): Promise<ImportMap> {
         const logger = options.logger || new Logger({ name: 'IMP-MAP' });
-        const importMapPath = PATH.resolve(projectRoot, filename);
         let data: ImportMap.Data;
-        if (!await File.exists(importMapPath)) {
+        if (!await File.exists(path)) {
+            const filename = Path.fileName(path);
             logger.warn(`&C3${filename} not found. Creating defaults...`);
-            data = Schemas.ImportMap.processData({});
+            data = schema.ImportMap.processData({});
             // await ImportMap.save(projectRoot, filename, data, { logger });
         } else {
-            const content = await File.read(importMapPath, 'utf-8');
+            const content = await File.read(path, 'utf-8');
             const json = JSON.parse(content);
-            data = Schemas.ImportMap.processData(json);
-        } return new ImportMap(data, projectRoot, filename, { logger });
+            data = schema.ImportMap.processData(json);
+        } return new ImportMap(data, path, { logger });
     }
 }
 export namespace ImportMap {
-    export type Data = Schemas.ImportMap['infer'];
+    export type Data = schema.ImportMap.Root;
     export interface Options {
         logger?: Logger;
     }

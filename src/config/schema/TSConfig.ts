@@ -17,6 +17,7 @@ export const TSConfig = new Schema({
         compilerOptions: CompilerOptions.root
     }
 });
+
 export namespace TSConfig {
     export namespace Root {
         export type CompilerOptions = typeof CompilerOptions.infer;
