@@ -6,8 +6,8 @@ export const ExtractorEntry = new Schema({
     required: true,
     properties: {
         to: { type: 'string', required: true },
-        map: Transform.root,
-        transform: Transform.root
+        map: { ...Transform.root, required: false },
+        transform: { ...Transform.root, required: false }
     }
 });
 export type ExtractorEntry = typeof ExtractorEntry.infer;
