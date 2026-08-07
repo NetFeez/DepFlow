@@ -1,5 +1,6 @@
 import { File, Path } from '@netfeez/common-node';
-import Grouper from '@netfeez/vterm/logger/Grouper';
+
+import type Grouper from '@netfeez/vterm/logger/Grouper';
 
 export class Utils {
     protected static REPO_REGEX = /^(?:https:\/\/github\.com\/([^/]+)\/([^/.]+)(?:\.git)?|git@github\.com:([^/]+)\/([^/.]+)(?:\.git)?)$/;

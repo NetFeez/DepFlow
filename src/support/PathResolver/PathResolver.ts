@@ -11,7 +11,7 @@ import { Logger } from "@netfeez/vterm";
 import Utils from '../Utils.js';
 import PathRewriter from './PathRewriter.js';
 import AliasCompiler from './AliasCompiler.js';
-import Async from "@netfeez/common-node/Async";
+import Async from "@netfeez/common-node/Async.js";
 import Config from '../../config/Config.js';
 
 export class PathResolver {

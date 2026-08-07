@@ -4,7 +4,7 @@ import Task from "../Task/Task.js";
 import Utils from "../Utils.js";
 import { Dependency } from "./Dependency.js";
 import Logger from "@netfeez/vterm";
-import Async from "@netfeez/common-node/Async";
+import Async from "@netfeez/common-node/Async.js";
 import schema from "../../schema/schema.js";
 
 export class NpmDependency extends Dependency implements NpmDependency.Dependency {
