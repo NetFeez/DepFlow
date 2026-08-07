@@ -5,7 +5,7 @@
  */
 import { File } from '@netfeez/common-node';
 
-import Schemas from './schemas.js';
+import schema from '../schema/schema.js';
 
 export class Config {
     /**
@@ -19,13 +19,13 @@ export class Config {
      */
     static async load(path: string): Promise<Config.Config> {
         if (!await File.exists(path)) {
-            const defaults = Schemas.Config.processData({});
+            const defaults = schema.Config.processData({});
             await Config.save(path, defaults);
             return defaults;
         } else {
             const content = await File.read(path, 'utf-8');
             const json = JSON.parse(content);
-            const config = Schemas.Config.processData(json);
+            const config = schema.Config.processData(json);
             return config;
         }
     }
@@ -44,8 +44,8 @@ export class Config {
     }
 }
 export namespace Config {
-    export type Config = typeof Schemas.Config.infer;
-    export type ConfigToProcess = typeof Schemas.Config.inferToProcess;
+    export type Config = schema.Config;
+    export type ConfigToProcess = schema.Config.toProcess;
 }
 
 export default Config;
