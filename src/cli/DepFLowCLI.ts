@@ -7,11 +7,12 @@ import Validator from "../support/Validator.js";
 import GitDependency from "../support/Dependency/GitDependency.js";
 import PathResolver from "../support/PathResolver/PathResolver.js";
 import Config from "../config/Config.js";
-import Schemas from "../config/schemas.js";
-import Tsconfig from "../config/Tsconfig.js";
+import schema from "../schema/schema.js";
+import TSConfig from "../config/TSConfig.js";
 import ImportMap from "../config/ImportMap.js";
 import NpmDependency from "../support/Dependency/NpmDependency.js";
 import Builder from "../support/Builder/Builder.js";
+import { Path } from "@netfeez/common-node";
 
 export class DepFlowCLI extends DebugUI {
     protected readonly projectRoot: string;
@@ -45,7 +46,7 @@ export class DepFlowCLI extends DebugUI {
             Validator.validateRepo(repo);
             if (!name) name = Utils.getRepoName(repo);
 
-            const dep = Schemas.GitDependency.processData({ name, repo });
+            const dep = schema.Dependency.GitDependency.processData({ name, repo });
 
             const config = await Config.load(this.configPath);
             config.dependencies.push(dep);
@@ -206,14 +207,16 @@ export class DepFlowCLI extends DebugUI {
             
             const tsconfigFile = config.tsconfig;
             const importMapFile = config.importmap;
-            
+            const tsconfigPath = path.join(this.projectRoot, tsconfigFile || 'tsconfig.json');
+            const importMapPath = path.join(this.projectRoot, importMapFile || 'importmap.json');
+
             if (tsconfigFile) {
-                const tsconfig = await Tsconfig.load(this.projectRoot, tsconfigFile, { logger: this.out });
+                const tsconfig = await TSConfig.load(tsconfigPath, { logger: this.out });
                 tsconfig.updatePaths(resolver.aliases);
                 await tsconfig.save();
             } else this.out.warn(`No tsconfig file specified in configuration. Skipping tsconfig synchronization.`);
             if (importMapFile) {
-                const importmap = await ImportMap.load(this.projectRoot, importMapFile, { logger: this.out });
+                const importmap = await ImportMap.load(importMapPath, { logger: this.out });
                 importmap.updateImports(resolver.aliases, mode);
                 await importmap.save();
             } else this.out.warn(`No import map file specified in configuration. Skipping import map synchronization.`);

@@ -3,14 +3,11 @@ import { File } from "@netfeez/common-node";
 
 import DepFlowCLI from "./DepFLowCLI.js";
 import { Utils } from "../support/Utils.js";
-import Schemas from "../config/schemas.js";
+import schema from "../schema/schema.js";
 
 async function startupSchemaValidation(flowPath: string) {
-    const jsonSchema = Schemas.Config.jsonSchema;
-    // Temporarily write the schema to the .depflow directory for validation purposes
-    // The vscode configuration was out for now, while ill enhance it we will use the $schema property in the depflow.json file to point to this schema
+    const jsonSchema = schema.Config.jsonSchema;
     File.write(`.depflow/schema.json`, JSON.stringify(jsonSchema));
-    // Utils.addVscodeValidation(flowPath, jsonSchema);
 }
 
 const skip = 2;
