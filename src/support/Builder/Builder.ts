@@ -1,14 +1,13 @@
 import type Logger from "@netfeez/vterm";
 import { Async } from "@netfeez/common-node";
 
-import type Schemas from "../../config/schemas.js";
-
 import Utils from "../Utils.js";
 import Task from "../Task/Task.js";
 import { File, Path } from "@netfeez/common-node";
+import schema from "../../schema/schema.js";
 
 export class Builder {
-    protected readonly pipeline: Builder.BuilderEntry[] = [];
+    protected readonly pipeline: Builder.Builder = [];
     protected readonly cwd: string = process.cwd();
     protected readonly logger: Logger | null;
 
@@ -34,12 +33,12 @@ export class Builder {
         }
         this.logger?.groupEnd();
     }
-    protected async runGlobalTransform(options: Schemas.GlobalTransform['infer']): Promise<void> {
+    protected async runGlobalTransform(options: schema.GlobalTransform): Promise<void> {
         this.logger?.log(`&C7Applying global transformation in &C3${this.cwd}&C7...`);
         const transformAction = Builder.replacer(options);
         const glob = options.glob;
 
-        await File.smartProcess('glob', this.cwd, {
+        await File.smartProcess(glob, this.cwd, {
             cwd: this.cwd,
         }, async ({ src, dest }) => {
             const content = await File.read(src);
@@ -55,24 +54,26 @@ export class Builder {
      * @returns A promise that resolves when the extraction process is complete, or rejects with an error if any issues occur during the file copying or transformation.
      * @throws Will throw an error if any issues occur during the file copying process, such as problems with reading or writing files, or if the provided entry configuration is invalid.
      */
-    protected async runExtractor(entry: string | Builder.Extractor[]): Promise<void> {
-        const extractor = typeof entry === 'string' ? [ { from: '**/*', to: entry } ] : entry;
+    protected async runExtractor(entry: string | Builder.Extractor): Promise<void> {
+        const extractor: Builder.Extractor = typeof entry === 'string'
+            ? { '**/*': { to: entry } }
+            : entry;
 
-        for (const entry of extractor) {
-            const { from, to: toEntry, pathReplacer, transform } = entry;
+        for (const [from, entry] of Object.entries(extractor)) {
+            const { to, map, transform } = typeof entry === 'string' ? { to: entry, map: undefined, transform: undefined } : entry;
 
-            const pathReplacerAction = Builder.replacer(pathReplacer);
-            const replacerAction = Builder.replacer(transform);
+            const mapper = Builder.replacer(map);
+            const replacer = Builder.replacer(transform);
 
-            const to = Path.isAbsolute(toEntry) ? toEntry : Path.join(Path.cwd, toEntry);
+            const destination = Path.isAbsolute(to) ? to : Path.join(Path.cwd, to);
             this.logger?.log(`&C7Extracting &C3${from}&C7 to &C3${to}&C7...`);
             
-            await File.smartProcess(from, to, {
+            await File.smartProcess(from, destination, {
                 cwd: this.cwd,
-                map: pathReplacerAction,
+                map: mapper,
             }, async ({ src, dest }) => {
                 const content = await File.read(src);
-                const transformedContent = replacerAction(content);
+                const transformedContent = replacer(content);
                 await File.write(dest, transformedContent);
             });
         }
@@ -105,9 +106,10 @@ export class Builder {
      * @returns A function that takes a string as input and returns a new string with the specified replacements applied, based on the provided replacer configuration.
      * @throws Will throw an error if the provided replacer configuration is invalid, such as if it is neither a string nor an object with the required properties.
      */
-    protected static replacer(replacer: Schemas.Transform['infer']): Builder.ReplacerAction {
+    protected static replacer(replacer?: schema.Transform): Builder.Transformer {
         if (typeof replacer === 'string') {
-            return (str) => str.replace(new RegExp(replacer, 'g'), '');
+            const search = new RegExp(replacer, 'g');
+            return (str) => str.replace(search, '');
         } else if (replacer !== null && typeof replacer === 'object') {
             const flags = replacer.flags || 'g';
             const search = new RegExp(replacer.search, flags);
@@ -117,12 +119,12 @@ export class Builder {
     }
 }
 export namespace Builder {
-    export type Replacer = Schemas.Transform['infer'];
-    export type ReplacerAction = (str: string) => string;
-    export type BuilderEntry = Schemas.BuilderEntry['infer'];
-    export type Extractor = Schemas.ExtractorEntry['infer'];
+    export type Transformer = (str: string) => string;
+    export type Transform = schema.Transform;
+    export type Builder = schema.Builder;
+    export type Extractor = schema.Extractor;
     export interface Info {
-        pipeline: BuilderEntry[];
+        pipeline: Builder;
         cwd: string;
         logger?: Logger | null;
     }
