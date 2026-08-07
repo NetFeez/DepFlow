@@ -2,7 +2,7 @@ import { Logger } from '@netfeez/vterm';
 import { File, Path } from '@netfeez/common-node';
 
 import AliasCompiler from '../support/PathResolver/AliasCompiler.js';
-import schema from './schema/schema.js';
+import schema from '../schema/schema.js';
 
 export class ImportMap {
     protected logger: Logger;
