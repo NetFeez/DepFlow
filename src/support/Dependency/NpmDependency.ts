@@ -1,12 +1,11 @@
 import { Path } from "@netfeez/common-node";
-import Schemas from "../../config/schemas.js";
 import Builder from "../Builder/Builder.js";
 import Task from "../Task/Task.js";
 import Utils from "../Utils.js";
 import { Dependency } from "./Dependency.js";
-import Resolver from "./Resolver.js";
 import Logger from "@netfeez/vterm";
 import Async from "@netfeez/common-node/Async";
+import schema from "../../schema/schema.js";
 
 export class NpmDependency extends Dependency implements NpmDependency.Dependency {
     public version: string;
@@ -68,7 +67,7 @@ export class NpmDependency extends Dependency implements NpmDependency.Dependenc
 
 }
 export namespace NpmDependency {
-        export type Resolver = Schemas.ResolverEntry['infer'];
-        export type Dependency = Schemas.NpmDependency['infer'];
+        export type Resolver = schema.Resolver;
+        export type Dependency = schema.Dependency.NpmDependency;
 }
 export default NpmDependency;

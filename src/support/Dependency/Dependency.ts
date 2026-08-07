@@ -7,7 +7,7 @@ export abstract class Dependency {
     protected readonly logger: Logger | null;
 
     public readonly name: string;
-    public readonly builder: Builder.BuilderEntry[];
+    public readonly builder: Builder.Builder;
     public readonly resolver: Resolver.ResolverEntry[];
 
     public constructor(info: Dependency.Info, logger?: Logger | null) {
@@ -40,7 +40,7 @@ export abstract class Dependency {
 export namespace Dependency {
     export interface Info {
         name: string;
-        builder?: Builder.BuilderEntry[];
+        builder?: Builder.Builder;
         resolver?: Resolver.ResolverEntry[];
     }
 }

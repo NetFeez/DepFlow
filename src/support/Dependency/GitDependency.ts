@@ -6,13 +6,12 @@
 import { File, Path } from '@netfeez/common-node';
 import Logger from "@netfeez/vterm";
 
-import Schemas from "../../config/schemas.js";
-import Config from "../../config/Config.js";
 import Validator from "../Validator.js";
 import Git from "../Git.js";
 import Utils from "../Utils.js";
 import Dependency from './Dependency.js';
 import Builder from '../Builder/Builder.js';
+import schema from '../../schema/schema.js';
 
 export class GitDependency extends Dependency implements GitDependency.Dependency {
     public readonly repo: GitDependency.repo;
@@ -69,7 +68,7 @@ export class GitDependency extends Dependency implements GitDependency.Dependenc
 
 export namespace GitDependency {
     export type repo = `https://github.com/${string}/${string}.git` | `git@github.com:${string}/${string}.git`;
-    export type Dependency = Schemas.GitDependency['infer'];
+    export type Dependency = schema.Dependency.GitDependency;
 }
 
 export default GitDependency;
