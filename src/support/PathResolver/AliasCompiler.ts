@@ -1,7 +1,8 @@
 import path from 'node:path';
 
-import Schemas from '../../config/schemas.js';
 import Utils from './Utils.js';
+import Config from '../../config/Config.js';
+import schema from '../../schema/schema.js';
 
 export class AliasCompiler {
     constructor(private projectRoot: string) {}
@@ -12,13 +13,13 @@ export class AliasCompiler {
      * @param config The configuration object containing dependencies with resolver entries to compile into aliases.
      * @returns An array of compiled alias objects ready for use in path resolution.
      */
-    public compile(config: Schemas.Config['infer']): AliasCompiler.CompiledAlias[] {
+    public compile(config: Config.Config): AliasCompiler.CompiledAlias[] {
         const result: AliasCompiler.CompiledAlias[] = [];
         const allDeps = [
             ...(config.dependencies || []),
             ...(config.npmDependencies || [])
         ];
-        const baseResolvers = config.resolver || [];
+        const baseResolvers = config.resolver || {};
         for (const dep of allDeps) {
             if (typeof dep !== 'object' || !dep.resolver) continue;
             result.push(...this.resolve(dep.resolver));
@@ -33,25 +34,25 @@ export class AliasCompiler {
      * @param resolver An array of resolver entries to process into compiled aliases.
      * @returns An array of compiled alias objects derived from the resolver entries.
      */
-    protected resolve(resolver: AliasCompiler.Resolver[]): AliasCompiler.CompiledAlias[] {
+    protected resolve(resolver: AliasCompiler.Resolver): AliasCompiler.CompiledAlias[] {
         const result: AliasCompiler.CompiledAlias[] = [];
-        for (const entry of resolver) {
-            const isWildcard = Utils.isWildcard(entry.alias);
-            const alias = Utils.removeWildcardSuffix(entry.alias);
+        for (const [crudeAlias, target] of Object.entries(resolver)) {
+            const isWildcard = Utils.isWildcard(crudeAlias);
+            const alias = Utils.removeWildcardSuffix(crudeAlias);
 
-            const rawLocal = typeof entry.target === 'string' ? entry.target : entry.target.local;
+            const rawLocal = typeof target === 'string' ? target : target.local;
             const localTarget = path.isAbsolute(rawLocal) 
                 ? Utils.removeWildcardSuffix(rawLocal)
                 : path.resolve(this.projectRoot, Utils.removeWildcardSuffix(rawLocal));
 
             let cdnTarget: string | undefined;
             let typeTarget: string | undefined;
-            if (typeof entry.target === 'object') {
-                if (entry.target.type) {
-                    typeTarget = Utils.removeWildcardSuffix(entry.target.type);
+            if (typeof target === 'object') {
+                if (target.type) {
+                    typeTarget = Utils.removeWildcardSuffix(target.type);
                 }
-                if (entry.target.cdn) {
-                    cdnTarget = Utils.removeWildcardSuffix(entry.target.cdn);
+                if (target.cdn) {
+                    cdnTarget = Utils.removeWildcardSuffix(target.cdn);
                 }
             }
             result.push({ alias, isWildcard, targets: { local: localTarget, type: typeTarget, cdn: cdnTarget } });
@@ -60,12 +61,8 @@ export class AliasCompiler {
     }
 }
 export namespace AliasCompiler {
-    export type Resolver = Schemas.ResolverEntry['infer'];
-    export interface Target {
-        local: string;
-        type?: string;
-        cdn?: string;
-    }
+    export type Resolver = schema.Resolver;
+    export type Target = Exclude<schema.Target, string>;
     export interface CompiledAlias {
         alias: string;
         targets: Target;

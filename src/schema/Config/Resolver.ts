@@ -24,10 +24,9 @@ export namespace Target {}
 
 export const Resolver = new Schema({
     type: 'object',
-    properties: {
-        alias: { type: 'string', required: true },
-        target: Target.root
-    }
+    required: true,
+    default: {},
+    allowAdditionalProperties: Target.root,
 });
 export type Resolver = typeof Resolver.infer;
 export namespace Resolver {}

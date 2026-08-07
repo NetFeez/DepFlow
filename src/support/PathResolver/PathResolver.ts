@@ -9,11 +9,10 @@ import { File, Path } from '@netfeez/common-node';
 import { Logger } from "@netfeez/vterm";
 
 import Utils from '../Utils.js';
-import Schemas from '../../config/schemas.js';
 import PathRewriter from './PathRewriter.js';
 import AliasCompiler from './AliasCompiler.js';
-import Glob from "@netfeez/common-node/Glob";
 import Async from "@netfeez/common-node/Async";
+import Config from '../../config/Config.js';
 
 export class PathResolver {
     public static readonly PROJECT_ROOT = process.cwd();
@@ -25,7 +24,7 @@ export class PathResolver {
     public readonly aliases: AliasCompiler.CompiledAlias[];
 
     public constructor(
-        public readonly config: Schemas.Config['infer'],
+        public readonly config: Config.Config,
         public readonly options: PathResolver.Options = {},
     ) {
         this.logger = options.logger || new Logger({ name: 'PATH-RW' });

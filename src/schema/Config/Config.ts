@@ -12,7 +12,7 @@ export const Config = new Schema({
         tsconfig: { type: 'string', nullable: true, default: null },
         importmap: { type: 'string', nullable: true, default: null },
         actions: { type: 'object', allowAdditionalProperties: Builder.root, default: {} },
-        resolver: { type: 'array', default: [], items: Resolver.root },
+        resolver: Resolver.root,
         dependencies: { type: 'array', default: [], items: GitDependency.root },
         npmDependencies: { type: 'array', default: [], items: NpmDependency.root }
     }
