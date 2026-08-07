@@ -35,7 +35,7 @@ export class ImportMap {
 
             if (target === aliasObj.targets.local) {
                 target = Path.diff(projectRoot, target);
-                target = target.startsWith('/') ? target : `/${target}`;
+                target = target.startsWith('.') ? target : `./${target}`;
                 target = Path.normalize(target);
             }
             if (aliasObj.isWildcard) {
