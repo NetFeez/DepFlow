@@ -24,17 +24,17 @@ export class PathResolver {
     public readonly aliases: AliasCompiler.CompiledAlias[];
 
     public constructor(
-        public readonly config: Config.Config,
+        public readonly config: Config,
         public readonly options: PathResolver.Options = {},
     ) {
         this.logger = options.logger || new Logger({ name: 'PATH-RW' });
         
-        const outDir = config.outDir || 'build';
+        const outDir = config.data.outDir || 'build';
         this.outDir = !Path.isAbsolute(outDir)
             ? Path.resolve(PathResolver.PROJECT_ROOT, outDir)
             : outDir;
 
-        this.aliases = new AliasCompiler(PathResolver.PROJECT_ROOT).compile(config);
+        this.aliases = new AliasCompiler(PathResolver.PROJECT_ROOT).compile(config.data);
         this.rewriter = new PathRewriter(this.aliases, PathResolver.PROJECT_ROOT);
     }
     /**

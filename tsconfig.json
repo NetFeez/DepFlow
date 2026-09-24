@@ -6,7 +6,7 @@
         "declaration": true,
         "sourceMap": true,
         "strict": true,
-        "outDir": "build",
+        "outDir": "dist",
         "rootDir": "src",
         "types": [ "node" ]
     },

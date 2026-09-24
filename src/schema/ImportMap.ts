@@ -1,13 +1,24 @@
-import { Schema } from '@netfeez/common';
+import Schema from '@netfeez/schema';
 
 export const ImportMap = new Schema({
     type: 'object',
-    allowAdditionalProperties: true,
+    additional: true,
     default: {},
-    properties: {
-        imports: { type: 'object', allowAdditionalProperties: true, default: {} },
-        scopes: { type: 'object', allowAdditionalProperties: true, default: {} }
-    }
+    keys: {
+        imports: {
+            type: 'object',
+            additional: true,
+            default: {},
+            description: 'Mapping of bare specifiers to their resolved URLs or paths.'
+        },
+        scopes: {
+            type: 'object',
+            additional: true,
+            default: {},
+            description: 'Scope-based mappings of bare specifiers to their resolved URLs or paths.'
+        }
+    },
+    description: 'Structure of an import map file.'
 });
 
 export namespace ImportMap {

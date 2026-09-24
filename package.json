@@ -34,7 +34,9 @@
   "dependencies": {
     "@netfeez/common": "^4.2.0",
     "@netfeez/common-node": "^3.4.0",
-    "@netfeez/vterm": "^1.1.0"
+    "@netfeez/schema": "^0.1.0",
+    "@netfeez/vterm": "^1.1.0",
+    "@netfeez/yaml": "^0.2.0"
   },
   "devDependencies": {
     "@types/node": "^25.6.0",

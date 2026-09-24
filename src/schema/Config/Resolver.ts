@@ -1,11 +1,21 @@
-import { Schema } from '@netfeez/common';
+import Schema from '@netfeez/schema';
 
 export const TargetOptions = new Schema({
     type: 'object',
-    properties: {
-        local: { type: 'string', required: true },
-        type: { type: 'string' },
-        cdn: { type: 'string' }
+    keys: {
+        local: {
+            type: 'string',
+            required: true,
+            description: 'Local path or glob pattern the dependency resolves to.'
+        },
+        type: {
+            type: 'string',
+            description: 'Optional identifier describing the resolution type.'
+        },
+        cdn: {
+            type: 'string',
+            description: 'CDN URL used when the dependency is resolved in CDN mode.'
+        }
     }
 });
 export type TargetOptions = typeof TargetOptions.infer;
@@ -16,8 +26,9 @@ export const Target = new Schema({
     required: true,
     union: [
         { type: 'string' },
-        TargetOptions.root
-    ]
+        TargetOptions.definition
+    ],
+    description: 'Resolution target of a dependency: either a plain string or an object with local, type and cdn options.'
 });
 export type Target = typeof Target.infer;
 export namespace Target {}
@@ -26,7 +37,8 @@ export const Resolver = new Schema({
     type: 'object',
     required: true,
     default: {},
-    allowAdditionalProperties: Target.root,
+    additional: Target.definition,
+    description: 'Mapping of dependency names to their resolution targets (local file or CDN).'
 });
 export type Resolver = typeof Resolver.infer;
 export namespace Resolver {}

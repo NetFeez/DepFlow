@@ -1,51 +1,27 @@
 /**
  * @author NetFeez <netfeez.dev@gmail.com>
- * @description Utility to help with File operations.
+ * @description Depflow main configuration store, persisted as JSON or YAML with generated comments.
  * @license Apache-2.0
  */
-import { File } from '@netfeez/common-node';
+import { Document } from '@netfeez/yaml';
 
 import schema from '../schema/schema.js';
+import Settings from '../support/Settings.js';
 
-export class Config {
+export class Config extends Settings<typeof schema.Config> {
+    protected static schema = schema.Config;
+
     /**
-     * Loads the configuration from a file at the specified path.
-     * If the file does not exist, it creates a new configuration file with default values and returns those defaults.
-     * If the file exists, it reads the content, parses it as JSON, and processes it using the defined schema to ensure it conforms to the expected structure.
-     * This method is essential for managing application settings or other relevant information in a structured format that can be easily read and modified as needed.
-     * @param path The file system path of the configuration file to load.
-     * @returns A promise that resolves to the loaded configuration object, which conforms to the expected structure defined in the Config.Config type.
-     * @throws Will throw an error if there is an issue during the file reading or writing process, such as insufficient permissions or invalid path.
+     * Decorates a freshly-created YAML document with the file header and field comments.
+     * @param document - The YAML document to decorate.
      */
-    static async load(path: string): Promise<Config.Config> {
-        if (!await File.exists(path)) {
-            const defaults = schema.Config.processData({});
-            await Config.save(path, defaults);
-            return defaults;
-        } else {
-            const content = await File.read(path, 'utf-8');
-            const json = JSON.parse(content);
-            const config = schema.Config.processData(json);
-            return config;
-        }
+    protected static comments(document: Document): void {
+        document.header.push(
+            '# Depflow Configuration File',
+            '# You can use Red Hat extension to use YAML schema validation in VSCode: "$schema: .depflow/schema/config.schema.json"'
+        );
+        Settings.applyComments(document, Settings.commentsFromSchema(schema.Config));
     }
-    /**
-     * Saves the provided configuration object to a file at the specified path.
-     * It converts the configuration object into a JSON string with proper formatting and writes it to the file using the File.write method.
-     * This function is essential for persisting configuration data, allowing applications to store settings or other relevant information in a structured format that can be easily read and modified as needed.
-     * @param path The file system path where the configuration should be saved.
-     * @param config The configuration object to be saved, which should conform to the expected structure defined in the Config.ConfigToProcess type.
-     * @returns A promise that resolves when the save operation is complete.
-     * @throws Will throw an error if there is an issue during the file writing process, such as insufficient permissions or invalid path.
-     */
-    static async save(path: string, config: Config.ConfigToProcess): Promise<void> {
-        const content = JSON.stringify(config, null, 2);
-        await File.write(path, content, 'utf-8');
-    }
-}
-export namespace Config {
-    export type Config = schema.Config;
-    export type ConfigToProcess = schema.Config.toProcess;
 }
 
 export default Config;

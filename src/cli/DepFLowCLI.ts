@@ -35,6 +35,8 @@ export class DepFlowCLI extends DebugUI {
         this.addCommand('list', this.list, { usage: 'dep list', description: 'List all dependencies in the configuration file.' });
         this.addCommand('rewrite-paths', this.rewritePaths, { usage: 'dep rewrite-paths [--watch] [--cdn]', description: 'Resolve and rewrite paths in built files based on depFlow configuration.' });
         this.addCommand('sync', this.commandSync, { usage: 'dep sync', description: 'Syncs depFlow.json with tsconfig.json and generates the importmap.'  });
+        this.addCommand('json-to-yaml', this.convert, { usage: 'dep json-to-yaml [output.yaml]', description: 'Convert the depflow config file from JSON to YAML.' });
+        this.addCommand('yaml-to-json', this.convert, { usage: 'dep yaml-to-json [output.json]', description: 'Convert the depflow config file from YAML to JSON.' });
     }
     public async commandAdd(command: string, args: string[]) {
         try {
@@ -46,11 +48,11 @@ export class DepFlowCLI extends DebugUI {
             Validator.validateRepo(repo);
             if (!name) name = Utils.getRepoName(repo);
 
-            const dep = schema.Dependency.GitDependency.processData({ name, repo });
+            const dep = schema.Dependency.GitDependency.process({ name, repo });
 
             const config = await Config.load(this.configPath);
-            config.dependencies.push(dep);
-            await Config.save(this.configPath, config);
+            config.data.dependencies.push(dep);
+            await config.save();
 
             this.out.info(`Added dependency "${dep.name}".`);
         } catch (error) { this.out.error(`&C1${error}`); }
@@ -64,8 +66,8 @@ export class DepFlowCLI extends DebugUI {
             if (!identifier) throw new Error('Usage: dep remove <name> | <repo_url>');
 
             const config = await Config.load(this.configPath);
-            config.dependencies = config.dependencies.filter(dep => dep.name !== identifier && dep.repo !== identifier);
-            await Config.save(this.configPath, config);
+            config.data.dependencies = config.data.dependencies.filter(dep => dep.name !== identifier && dep.repo !== identifier);
+            await config.save();
 
             this.out.info(`Removed dependency "${identifier}".`);
         } catch (error) { this.out.error(`&C1${error}`); }
@@ -76,7 +78,7 @@ export class DepFlowCLI extends DebugUI {
             this.out.group(Utils.newGroup('#FFB4DC'));
 
             const config = await Config.load(this.configPath);
-            const gitDependencies = config.dependencies;
+            const gitDependencies = config.data.dependencies;
 
             if (gitDependencies.length === 0) throw new Error(args.length > 0 ? 'Specified dependencies not found.' : 'No dependencies to install.');
 
@@ -87,7 +89,7 @@ export class DepFlowCLI extends DebugUI {
                     this.out.info(`&C5Installing &C6"${dep.name}" &C5from &C6${dep.repo}&C5...`);
                     this.out.line();
 
-                    const dependency = new GitDependency(config.flowFolder, dep, this.out);
+                    const dependency = new GitDependency(config.data.flowFolder, dep, this.out);
                     await dependency.install();
 
                     this.out.line();
@@ -95,14 +97,14 @@ export class DepFlowCLI extends DebugUI {
                 } finally { this.out.groupEnd(); }
             }
 
-            const npmDependencies = config.npmDependencies;
+            const npmDependencies = config.data.npmDependencies;
             for (const dep of npmDependencies) {
                 try {
                     this.out.group(Utils.newGroup('#FFB4DC'));
                     this.out.info(`&C5Installing npm dependency &C6"${dep.name}" &C5version &C6${dep.version}&C5...`);
                     this.out.line();
 
-                    const dependency = new NpmDependency(config.flowFolder, dep, this.out);
+                    const dependency = new NpmDependency(config.data.flowFolder, dep, this.out);
                     await dependency.install();
 
                     this.out.line();
@@ -119,7 +121,7 @@ export class DepFlowCLI extends DebugUI {
             this.out.group(Utils.newGroup('#FFB4DC'));
 
             const config = await Config.load(this.configPath);
-            const dependencies = config.dependencies;
+            const dependencies = config.data.dependencies;
 
             if (dependencies.length === 0) throw new Error(args.length > 0 ? 'Specified dependencies not found.' : 'No dependencies to uninstall.');
 
@@ -128,7 +130,7 @@ export class DepFlowCLI extends DebugUI {
                     this.out.group(Utils.newGroup('#FFB4DC'));
                     this.out.info(`&C1Uninstalling "${dep.name}" from "${dep.repo}"...`);
                     this.out.line();
-                    const dependency = new GitDependency(config.flowFolder, dep, this.out);
+                    const dependency = new GitDependency(config.data.flowFolder, dep, this.out);
                     await dependency.uninstall();
                     this.out.line();
                     this.out.info(`Uninstalled "${dep.name}".`);
@@ -147,7 +149,7 @@ export class DepFlowCLI extends DebugUI {
             this.out.info(`&C5Running action &C6${actionName}&C5...`);
 
             const config = await Config.load(this.configPath);
-            const action = config.actions[actionName];
+            const action = config.data.actions[actionName];
             if (!action) throw new Error(`action "${actionName}" not found in configuration.`);
 
             const pipeline = Array.isArray(action) ? action : [action];
@@ -165,10 +167,10 @@ export class DepFlowCLI extends DebugUI {
         this.out.group(Utils.newGroup('#FFB4DC'));
         try {
             const config = await Config.load(this.configPath);
-            if (config.dependencies.length === 0) {
+            if (config.data.dependencies.length === 0) {
                 this.out.info(`No dependencies found.`);
             }
-            for (const dep of config.dependencies) {
+            for (const dep of config.data.dependencies) {
                 this.out.info(`&C6${dep.name} &C7from &C2${dep.repo}`);
             }
         } catch (error) { this.out.error(`&C1${error}`); }
@@ -181,7 +183,7 @@ export class DepFlowCLI extends DebugUI {
             const watch = args.includes('--watch') || args.includes('-w');
             const useCDN = args.includes('--cdn');
             const mode: PathResolver.Mode = useCDN ? 'cdn' : 'local';
-            const dir = config.outDir;
+            const dir = config.data.outDir;
 
             this.out.info(`Mode: &C3${useCDN ? 'CDN' : 'Local'}`);
             if (watch) this.out.info(`Watcher: &C2Enabled`);
@@ -205,8 +207,8 @@ export class DepFlowCLI extends DebugUI {
             const config = await Config.load(this.configPath);
             const resolver = new PathResolver(config, { logger: this.out });
             
-            const tsconfigFile = config.tsconfig;
-            const importMapFile = config.importmap;
+            const tsconfigFile = config.data.tsconfig;
+            const importMapFile = config.data.importmap;
             const tsconfigPath = path.join(this.projectRoot, tsconfigFile || 'tsconfig.json');
             const importMapPath = path.join(this.projectRoot, importMapFile || 'importmap.json');
 
@@ -223,6 +225,32 @@ export class DepFlowCLI extends DebugUI {
 
             this.out.info(`&C2Successfully synced all configurations.`);
         } catch (error) { this.out.error(`&C1Error during sync: ${error}`); }
+        finally { this.out.groupEnd(); }
+    }
+    /**
+     * Converts the depflow config file between JSON and YAML.
+     * @param command - The invoked command name ('json-to-yaml' or 'yaml-to-json').
+     * @param args - Optional output file path.
+     */
+    public async convert(command: string, args: string[]) {
+        try {
+            this.out.group(Utils.newGroup('#FFB4DC'));
+
+            const to = command === 'json-to-yaml' ? 'yaml' : 'json';
+            const input = this.configPath;
+            const inputExt = Path.extName(input).toLowerCase();
+            const isJsonInput = inputExt === '.json';
+            const isYamlInput = inputExt === '.yaml' || inputExt === '.yml';
+            if (!isJsonInput && !isYamlInput) throw new Error(`Unsupported config file extension: ${inputExt}`);
+            if (isYamlInput === (to === 'yaml')) throw new Error(`Config file is already ${to}: ${input}`);
+
+            const config = await Config.load(input);
+            const [output] = args;
+            const outPath = output || path.join(this.projectRoot, `${Path.fileName(input, false)}.${to}`);
+            await config.save(outPath);
+
+            this.out.info(`&C2Converted &C4${Path.fileName(input)} &C7→&R &C4${Path.fileName(outPath)} &C2(&C3${to.toUpperCase()}&C2).`);
+        } catch (error: any) { this.out.error(`&C1${error.message || error}`); }
         finally { this.out.groupEnd(); }
     }
 }
