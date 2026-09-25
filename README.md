@@ -138,9 +138,8 @@ The CLI exposes the following commands (all commands accept the global `--flow <
 | Command | Usage | Description |
 |---|---|---|
 | `add` | `dep add <repo_url> [name] [--flow <file>]` | Add a git dependency to the configuration file. If the configuration file does not exist it will be created automatically (default: `depflow.json`). If `name` is omitted the repo name is used. |
-| `remove` | `dep remove <name|repo_url> [--flow <file>]` | Remove a dependency by `name` or repository URL. |
+| `remove` | `dep remove <name|repo_url> [--flow <file>]` | Remove a dependency by `name` or repository URL and uninstall its local files. |
 | `install` | `dep install [name1 name2 ...] [--flow <file>]` | Clone, build and extract artifacts for all or specific dependencies. Runs `dep sync` after install. |
-| `uninstall` | `dep uninstall [name1 name2 ...] [--flow <file>]` | Remove local files for configured dependencies. |
 | `list` | `dep list [--flow <file>]` | List all dependencies declared in the configuration. |
 | `rewrite-paths` | `dep rewrite-paths [--watch] [--cdn] [--flow <file>]` | Rewrite built files' paths according to resolver aliases. Use `--watch` to run a watcher; use `--cdn` to apply CDN targets instead of local targets. |
 | `sync` | `dep sync [--cdn] [--flow <file>]` | Update `tsconfig` paths and generate `importmap` from resolver aliases. Use `--cdn` to prefer CDN targets when generating the importmap. |

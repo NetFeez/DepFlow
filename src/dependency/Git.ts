@@ -35,7 +35,7 @@ export class Git {
             `cd ${path}`,
         ];
         if (tag) commands.push(`git checkout ${tag}`);
-        await this.runTask(commands, { cwd, logger });
+        await this.runTask(commands, { cwd, logger }, 'clone');
     }
     /**
      * Performs a 'git pull' operation on the specified repository path, optionally checking out a specific tag after pulling the latest changes.
@@ -56,7 +56,7 @@ export class Git {
             `git pull`
         ];
         if (tag) commands.push(`git checkout ${tag}`);
-        await this.runTask(commands, { cwd, logger });
+        await this.runTask(commands, { cwd, logger }, 'pull');
     }
     /**
      * Executes a series of Git commands as a Task, providing real-time logging and error handling through the provided Logger instance.
@@ -64,7 +64,7 @@ export class Git {
      * It listens for 'line' events to log standard output and 'error' events to log any errors that occur during command execution, including the step at which the error occurred.
      * Once all commands have been executed, it listens for the 'finish' event to determine the overall success of the operation, logging a summary of the results and resolving or rejecting the promise accordingly based on whether any steps failed.
      */
-    protected static async runTask(commands: string[], options: Git.ShellOptions): Promise<Task.FinishData> {
+    protected static async runTask(commands: string[], options: Git.ShellOptions, operation: string): Promise<Task.FinishData> {
         const { cwd = process.cwd(), logger } = options;
         return Async.awaitEvent<Task.FinishData>((done, fail) => {
             const task = new Task(cwd, commands);
@@ -74,7 +74,7 @@ export class Git {
             }
             task.once('finish', (summary) => {
                 if (summary.fails === 0) done(summary);
-                else fail(new Error(`Git clone failed with ${summary.fails} failed steps.\nErrors:\n${summary.errors.join('\n')}`));
+                else fail(new Error(`Git ${operation} failed with ${summary.fails} failed steps.\nErrors:\n${summary.errors.join('\n')}`));
             });
             task.start().catch(fail);
             return () => { task.stop(); };

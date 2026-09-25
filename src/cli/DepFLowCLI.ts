@@ -30,9 +30,8 @@ export class DepFlowCLI extends DebugUI {
         this.projectRoot = path.dirname(absoluteConfigPath);
 
         this.addCommand('add', this.commandAdd, { usage: 'dep add <repo_url> [name]', description: 'Add a dependency to the configuration file.' });
-        this.addCommand('remove', this.commandRemove, { usage: 'dep remove <name> | <repo_url>', description: 'Remove a dependency from the configuration file by name or repo URL.' });
+        this.addCommand('remove', this.commandRemove, { usage: 'dep remove <name> | <repo_url>', description: 'Remove a dependency from the configuration file and uninstall its files.' });
         this.addCommand('install', this.commandInstall, { usage: 'dep install [name1 name2 ...]', description: 'Install dependencies. If names are provided, only those dependencies will be installed.' });
-        this.addCommand('uninstall', this.uninstall, { usage: 'dep uninstall [name1 name2 ...]', description: 'Uninstall dependencies. If names are provided, only those dependencies will be uninstalled.' });
         this.addCommand('run', this.commandRun, { usage: 'dep run <script>', description: 'Run a custom action defined in the configuration file.' });
         this.addCommand('list', this.list, { usage: 'dep list', description: 'List all dependencies in the configuration file.' });
         this.addCommand('rewrite-paths', this.rewritePaths, { usage: 'dep rewrite-paths [--watch] [--cdn]', description: 'Resolve and rewrite paths in built files based on depFlow configuration.' });
@@ -67,7 +66,15 @@ export class DepFlowCLI extends DebugUI {
             if (!identifier) throw new Error('Usage: dep remove <name> | <repo_url>');
 
             const config = await Config.load(this.configPath);
+            const gitMatches = config.data.dependencies.filter(dep => dep.name === identifier || dep.repo === identifier);
+            const npmMatches = config.data.npmDependencies.filter(dep => dep.name === identifier);
+            if (gitMatches.length + npmMatches.length === 0) throw new Error(`Dependency "${identifier}" not found.`);
+
+            for (const dep of gitMatches) await new GitDependency(config.data.flowFolder, dep, this.out).uninstall();
+            for (const dep of npmMatches) await new NpmDependency(config.data.flowFolder, dep, this.out).uninstall();
+
             config.data.dependencies = config.data.dependencies.filter(dep => dep.name !== identifier && dep.repo !== identifier);
+            config.data.npmDependencies = config.data.npmDependencies.filter(dep => dep.name !== identifier);
             await config.save();
 
             this.out.info(`Removed dependency "${identifier}".`);
@@ -79,11 +86,17 @@ export class DepFlowCLI extends DebugUI {
 
             const config = await Config.load(this.configPath);
             const gitDependencies = config.data.dependencies;
+            const npmDependencies = config.data.npmDependencies;
 
-            if (gitDependencies.length === 0) throw new Error(args.length > 0 ? 'Specified dependencies not found.' : 'No dependencies to install.');
+            if (gitDependencies.length + npmDependencies.length === 0) throw new Error(args.length > 0 ? 'Specified dependencies not found.' : 'No dependencies to install.');
+
+            const names = new Set(args);
+            const gitTargets = args.length > 0 ? gitDependencies.filter(dep => names.has(dep.name)) : gitDependencies;
+            const npmTargets = args.length > 0 ? npmDependencies.filter(dep => names.has(dep.name)) : npmDependencies;
+            if (args.length > 0 && gitTargets.length + npmTargets.length === 0) throw new Error('Specified dependencies not found.');
 
             this.out.info(`&C5Installing dependencies...`);
-            for (const dep of gitDependencies) {
+            for (const dep of gitTargets) {
                 try {
                     this.out.group(newGroup('#FFB4DC'));
                     this.out.info(`&C5Installing &C6"${dep.name}" &C5from &C6${dep.repo}&C5...`);
@@ -97,8 +110,7 @@ export class DepFlowCLI extends DebugUI {
                 } finally { this.out.groupEnd(); }
             }
 
-            const npmDependencies = config.data.npmDependencies;
-            for (const dep of npmDependencies) {
+            for (const dep of npmTargets) {
                 try {
                     this.out.group(newGroup('#FFB4DC'));
                     this.out.info(`&C5Installing npm dependency &C6"${dep.name}" &C5version &C6${dep.version}&C5...`);
@@ -113,29 +125,6 @@ export class DepFlowCLI extends DebugUI {
             }
 
             await this.commandSync('sync', []);
-        } finally { this.out.groupEnd(); }
-    }
-    public async uninstall(command: string, args: string[]) {
-        try {
-            this.out.group(newGroup('#FFB4DC'));
-
-            const config = await Config.load(this.configPath);
-            const dependencies = config.data.dependencies;
-
-            if (dependencies.length === 0) throw new Error(args.length > 0 ? 'Specified dependencies not found.' : 'No dependencies to uninstall.');
-
-            for (const dep of dependencies) {
-                try {
-                    this.out.group(newGroup('#FFB4DC'));
-                    this.out.info(`&C1Uninstalling "${dep.name}" from "${dep.repo}"...`);
-                    this.out.line();
-                    const dependency = new GitDependency(config.data.flowFolder, dep, this.out);
-                    await dependency.uninstall();
-                    this.out.line();
-                    this.out.info(`Uninstalled "${dep.name}".`);
-                    this.out.groupEnd();
-                } finally { this.out.groupEnd(); }
-            }
         } finally { this.out.groupEnd(); }
     }
     public async commandRun(command: string, args: string[]) {
@@ -164,11 +153,14 @@ export class DepFlowCLI extends DebugUI {
         this.out.group(newGroup('#FFB4DC'));
         try {
             const config = await Config.load(this.configPath);
-            if (config.data.dependencies.length === 0) {
+            if (config.data.dependencies.length + config.data.npmDependencies.length === 0) {
                 this.out.info(`No dependencies found.`);
             }
             for (const dep of config.data.dependencies) {
                 this.out.info(`&C6${dep.name} &C7from &C2${dep.repo}`);
+            }
+            for (const dep of config.data.npmDependencies) {
+                this.out.info(`&C6${dep.name} &C7v&C2${dep.version}`);
             }
         } finally { this.out.groupEnd(); }
     }

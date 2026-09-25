@@ -37,22 +37,25 @@ export class GitDependency extends Dependency implements GitDependency.Data {
         return path;
     }
     public async install(): Promise<void> {
-        try {
-            this.logger?.group(newGroup('#00B4FF'));
-            if (await File.exists(this.folder)) {
-                this.logger?.log(`&C3Repository already exists, pulling latest changes...`);
-                await Git.pull(this.folder, { logger: this.logger ?? undefined });
-                this.logger?.log(`&C2Pull completed successfully.`);
-            } else {
-                this.logger?.log(`&C5Cloning repository from &C6${this.repo}&C5...`);
-                await Git.clone(this.repo, this.folder, { tag: this.tag, logger: this.logger ?? undefined });
-                this.logger?.log(`&C2Clone completed successfully.`);
-            }
-            await this.build();
-            this.logger?.groupEnd();
-        } catch (error) { throw error; }
+        this.logger?.group(newGroup('#00B4FF'));
+        if (await File.exists(this.folder)) {
+            this.logger?.log(`&C3Repository already exists, pulling latest changes...`);
+            await Git.pull(this.folder, { logger: this.logger ?? undefined });
+            this.logger?.log(`&C2Pull completed successfully.`);
+        } else {
+            this.logger?.log(`&C5Cloning repository from &C6${this.repo}&C5...`);
+            await Git.clone(this.repo, this.folder, { tag: this.tag, logger: this.logger ?? undefined });
+            this.logger?.log(`&C2Clone completed successfully.`);
+        }
+        await this.build();
+        this.logger?.groupEnd();
     }
-    public async uninstall(): Promise<void> {}
+    /** Removes the local clone from the flow folder, if present. **/
+    public async uninstall(): Promise<void> {
+        if (!await File.exists(this.folder)) return void this.logger?.log(`&C4No installation found for &C6${this.name}&C4, skipping.`);
+        this.logger?.log(`&C1Removing &C6${this.name}&C1 from &C4${this.folder}&C1...`);
+        await File.remove(this.folder);
+    }
     public async build(): Promise<void> {
         if (this.builder.length === 0) return;
         const builder = new Builder({

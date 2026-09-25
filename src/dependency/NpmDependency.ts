@@ -1,4 +1,4 @@
-import { Path } from "@netfeez/common-node";
+import { File, Path } from "@netfeez/common-node";
 import Builder from "../builder/Builder.js";
 import Task from "../task/Task.js";
 import { newGroup } from "../task/Group.js";
@@ -18,7 +18,7 @@ export class NpmDependency extends Dependency implements NpmDependency.Data {
         super({
             name: dependency.name,
             builder: dependency.builder,
-            resolver: dependency.resolver || []
+            resolver: dependency.resolver || {}
         }, logger);
         this.version = dependency.version;
     }
@@ -30,30 +30,36 @@ export class NpmDependency extends Dependency implements NpmDependency.Data {
     }
 
     public async install(): Promise<void> {
-        try {
-            this.logger?.group(newGroup('#00B4FF'));
-            this.logger?.log(`&C5Using npm to install &C6${this.name}&C5...`);
-            const identifier = `${this.name}@${this.version}`;
-            const task = new Task(this.flowFolder, [
-                `npm install ${identifier} --prefix ./ --no-save`
-            ]);
-            await Async.awaitEvent<void>((done, fail) => {
-                if (this.logger) {
-                    task.on('line', (data) => this.logger?.log(`&C3${data}`));
-                    task.on('error', (data) => this.logger?.error(`&C1${data}`));
-                }
-                task.on('finish', () => {
+        this.logger?.group(newGroup('#00B4FF'));
+        this.logger?.log(`&C5Using npm to install &C6${this.name}&C5...`);
+        const identifier = `${this.name}@${this.version}`;
+        const task = new Task(this.flowFolder, [
+            `npm install ${identifier} --prefix ./ --no-save`
+        ]);
+        await Async.awaitEvent<void>((done, fail) => {
+            if (this.logger) {
+                task.on('line', (data) => this.logger?.log(`&C3${data}`));
+                task.on('error', (data) => this.logger?.error(`&C1${data}`));
+            }
+            task.once('finish', (data) => {
+                if (data.fails > 0) fail(new Error(`npm install failed with ${data.fails} failed steps.`));
+                else {
                     this.logger?.log(`&C2Installation of ${this.name} completed successfully.`);
                     done();
-                });
-                task.start().catch(fail);
-                return () => { task.stop(); };
-            })
-            await this.build();
-            this.logger?.groupEnd();
-        } catch (error) { throw error; }
+                }
+            });
+            task.start().catch(fail);
+            return () => { task.stop(); };
+        });
+        await this.build();
+        this.logger?.groupEnd();
     }
-    public async uninstall(): Promise<void> {}
+    /** Removes the installed npm package folder, if present. **/
+    public async uninstall(): Promise<void> {
+        if (!await File.exists(this.folder)) return void this.logger?.log(`&C4No installation found for &C6${this.name}&C4, skipping.`);
+        this.logger?.log(`&C1Removing &C6${this.name}&C1 from &C4${this.folder}&C1...`);
+        await File.remove(this.folder);
+    }
     public async build(): Promise<void> {
         if (this.builder.length === 0) return;
         const builder = new Builder({
