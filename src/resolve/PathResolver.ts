@@ -8,11 +8,10 @@ import FS, { promises as FSP } from 'node:fs';
 import { File, Path } from '@netfeez/common-node';
 import { Logger } from "@netfeez/vterm";
 
-import Utils from '../Utils.js';
 import PathRewriter from './PathRewriter.js';
 import AliasCompiler from './AliasCompiler.js';
 import Async from "@netfeez/common-node/Async.js";
-import schema from '../../schema/schema.js';
+import schema from '../schema/schema.js';
 
 export class PathResolver {
     public static readonly EXTENSIONS = ['.js', '.ts', '.jsx', '.tsx'];
@@ -94,7 +93,7 @@ export class PathResolver {
         await this.rewritePaths(mode);
         this.logger.log(`&C2Watching for changes in &C4${this.outDir}...`);
 
-        const debouncedProcessor = Utils.debounce(async (fullPath: string, filename: string) => {
+        const debouncedProcessor = PathResolver.debounce(async (fullPath: string, filename: string) => {
             if (await this.processFile(fullPath, mode)) {
                 this.logger.log(`&C2File &C4${filename}&C2 updated.`);
             }
@@ -109,6 +108,25 @@ export class PathResolver {
             const fullPath = Path.join(this.outDir, filename);
             debouncedProcessor(fullPath, filename);
         });
+    }
+    /**
+     * Debounces a function so it only executes after the specified delay has passed since the last invocation.
+     * @param fn - The function to debounce.
+     * @param delay - The number of milliseconds to wait before executing the function.
+     * @returns A debounced version of the function that delays its execution.
+     */
+    private static debounce<Args extends any[]>(
+        fn: (...args: Args) => void,
+        delay: number
+    ): (...args: Args) => void {
+        let timeoutId: NodeJS.Timeout | null = null;
+        return function(this: any, ...args: Args) {
+            if (timeoutId) clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => {
+                fn.apply(this, args);
+                timeoutId = null;
+            }, delay);
+        };
     }
 }
 export namespace PathResolver {

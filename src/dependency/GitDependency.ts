@@ -6,12 +6,12 @@
 import { File, Path } from '@netfeez/common-node';
 import Logger from "@netfeez/vterm";
 
-import Validator from "../Validator.js";
-import Git from "../Git.js";
-import Utils from "../Utils.js";
+import Validator from "./Validator.js";
+import Git from "./Git.js";
+import { newGroup } from "../task/Group.js";
 import Dependency from './Dependency.js';
-import Builder from '../Builder/Builder.js';
-import schema from '../../schema/schema.js';
+import Builder from '../builder/Builder.js';
+import schema from '../schema/schema.js';
 
 export class GitDependency extends Dependency implements GitDependency.Dependency {
     public readonly repo: GitDependency.repo;
@@ -38,7 +38,7 @@ export class GitDependency extends Dependency implements GitDependency.Dependenc
     }
     public async install(): Promise<void> {
         try {
-            this.logger?.group(Utils.newGroup('#00B4FF'));
+            this.logger?.group(newGroup('#00B4FF'));
             if (await File.exists(this.folder)) {
                 this.logger?.log(`&C3Repository already exists, pulling latest changes...`);
                 await Git.pull(this.folder, { logger: this.logger ?? undefined });

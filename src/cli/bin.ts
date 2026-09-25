@@ -2,7 +2,7 @@
 import { File } from "@netfeez/common-node";
 
 import DepFlowCLI from "./DepFLowCLI.js";
-import { Utils } from "../support/Utils.js";
+import Flags from "./Flags.js";
 import schema from "../schema/schema.js";
 
 async function startupSchemaValidation(flowPath: string) {
@@ -13,7 +13,7 @@ async function startupSchemaValidation(flowPath: string) {
 const skip = 2;
 const [commandName, ...argsList] = process.argv.slice(skip);
 
-const { args, flags } = Utils.extractFlags(argsList);
+const { args, flags } = Flags.extractFlags(argsList);
 const flowTag = flags['--flow'] || flags['-f'] || [];
 
 const flowPath = flowTag[0] || 'depflow.json';

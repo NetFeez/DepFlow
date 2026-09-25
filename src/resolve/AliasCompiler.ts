@@ -1,7 +1,7 @@
 import path from 'node:path';
 
 import Utils from './Utils.js';
-import schema from '../../schema/schema.js';
+import schema from '../schema/schema.js';
 
 export class AliasCompiler {
     constructor(private projectRoot: string) {}

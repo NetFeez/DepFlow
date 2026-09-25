@@ -1,9 +1,9 @@
 import { Logger } from '@netfeez/vterm';
 import { Path } from '@netfeez/common-node';
 
-import AliasCompiler from '../support/PathResolver/AliasCompiler.js';
+import AliasCompiler from '../resolve/AliasCompiler.js';
 import schema from '../schema/schema.js';
-import Settings from '../support/Settings.js';
+import Settings from './Settings.js';
 
 export class TSConfig extends Settings<typeof schema.TSConfig> {
     protected static schema = schema.TSConfig;

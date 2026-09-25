@@ -1,10 +1,10 @@
 import type Logger from "@netfeez/vterm";
 import { Async } from "@netfeez/common-node";
 
-import Utils from "../Utils.js";
-import Task from "../Task/Task.js";
+import { newGroup } from "../task/Group.js";
+import Task from "../task/Task.js";
 import { File, Path } from "@netfeez/common-node";
-import schema from "../../schema/schema.js";
+import schema from "../schema/schema.js";
 
 export class Builder {
     protected readonly pipeline: Builder.Builder = [];
@@ -17,7 +17,7 @@ export class Builder {
         this.logger = info.logger || null;
     }
     public async run(): Promise<void> {
-        this.logger?.group(Utils.newGroup('#00FFB4'));
+        this.logger?.group(newGroup('#00FFB4'));
         
         for (const step of this.pipeline) {
             if ('run' in step && step.run) {

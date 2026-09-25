@@ -1,11 +1,11 @@
 import { Path } from "@netfeez/common-node";
-import Builder from "../Builder/Builder.js";
-import Task from "../Task/Task.js";
-import Utils from "../Utils.js";
+import Builder from "../builder/Builder.js";
+import Task from "../task/Task.js";
+import { newGroup } from "../task/Group.js";
 import { Dependency } from "./Dependency.js";
 import Logger from "@netfeez/vterm";
 import Async from "@netfeez/common-node/Async.js";
-import schema from "../../schema/schema.js";
+import schema from "../schema/schema.js";
 
 export class NpmDependency extends Dependency implements NpmDependency.Dependency {
     public version: string;
@@ -31,7 +31,7 @@ export class NpmDependency extends Dependency implements NpmDependency.Dependenc
 
     public async install(): Promise<void> {
         try {
-            this.logger?.group(Utils.newGroup('#00B4FF'));
+            this.logger?.group(newGroup('#00B4FF'));
             this.logger?.log(`&C5Using npm to install &C6${this.name}&C5...`);
             const identifier = `${this.name}@${this.version}`;
             const task = new Task(this.flowFolder, [

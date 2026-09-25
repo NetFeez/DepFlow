@@ -6,7 +6,7 @@
 import { Document } from '@netfeez/yaml';
 
 import schema from '../schema/schema.js';
-import Settings from '../support/Settings.js';
+import Settings from './Settings.js';
 
 export class Config extends Settings<typeof schema.Config> {
     protected static schema = schema.Config;

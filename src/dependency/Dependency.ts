@@ -1,7 +1,7 @@
 import type Logger from "@netfeez/vterm";
 
-import type AliasCompiler from "../PathResolver/AliasCompiler.js";
-import type Builder from "../Builder/Builder.js";
+import type AliasCompiler from "../resolve/AliasCompiler.js";
+import type Builder from "../builder/Builder.js";
 
 export abstract class Dependency {
     protected readonly logger: Logger | null;
