@@ -55,8 +55,7 @@ export class DepFlowCLI extends DebugUI {
             await config.save();
 
             this.out.info(`Added dependency "${dep.name}".`);
-        } catch (error) { this.out.error(`&C1${error}`); }
-        finally { this.out.groupEnd(); }
+        } finally { this.out.groupEnd(); }
     }
     public async commandRemove(command: string, args: string[]) {
         try {
@@ -70,8 +69,7 @@ export class DepFlowCLI extends DebugUI {
             await config.save();
 
             this.out.info(`Removed dependency "${identifier}".`);
-        } catch (error) { this.out.error(`&C1${error}`); }
-        finally { this.out.groupEnd(); }
+        } finally { this.out.groupEnd(); }
     }
     public async commandInstall(command: string, args: string[]) {
         try {
@@ -113,8 +111,7 @@ export class DepFlowCLI extends DebugUI {
             }
 
             await this.commandSync('sync', []);
-        } catch (error) { this.out.error(`&C1${error}`); }
-        finally { this.out.groupEnd(); }
+        } finally { this.out.groupEnd(); }
     }
     public async uninstall(command: string, args: string[]) {
         try {
@@ -137,8 +134,7 @@ export class DepFlowCLI extends DebugUI {
                     this.out.groupEnd();
                 } finally { this.out.groupEnd(); }
             }
-        } catch (error) { this.out.error(`&C1${error}`); }
-        finally { this.out.groupEnd(); }
+        } finally { this.out.groupEnd(); }
     }
     public async commandRun(command: string, args: string[]) {
         try {
@@ -160,8 +156,7 @@ export class DepFlowCLI extends DebugUI {
                 logger: this.out
             });
             await builder.run();
-        } catch (error) { this.out.error(`&C1${error}`); }
-        finally { this.out.groupEnd(); }
+        } finally { this.out.groupEnd(); }
     }
     public async list(command: string, args: string[]) {
         this.out.group(Utils.newGroup('#FFB4DC'));
@@ -173,39 +168,36 @@ export class DepFlowCLI extends DebugUI {
             for (const dep of config.data.dependencies) {
                 this.out.info(`&C6${dep.name} &C7from &C2${dep.repo}`);
             }
-        } catch (error) { this.out.error(`&C1${error}`); }
-        finally { this.out.groupEnd(); }
+        } finally { this.out.groupEnd(); }
     }
-    public async rewritePaths(command: string, args: string[]) {
+    public async rewritePaths(command: string, args: string[], flags: Utils.FlagMap = {}) {
         this.out.group(Utils.newGroup('#FFB4DC'));
         try {
             const config = await Config.load(this.configPath);
-            const watch = args.includes('--watch') || args.includes('-w');
-            const useCDN = args.includes('--cdn');
+            const watch = flags['--watch'] !== undefined || flags['-w'] !== undefined;
+            const useCDN = flags['--cdn'] !== undefined;
             const mode: PathResolver.Mode = useCDN ? 'cdn' : 'local';
-            const dir = config.data.outDir;
 
             this.out.info(`Mode: &C3${useCDN ? 'CDN' : 'Local'}`);
             if (watch) this.out.info(`Watcher: &C2Enabled`);
 
-            const resolver = new PathResolver(config, { logger: this.out });
+            const resolver = new PathResolver(config.data, this.projectRoot, { logger: this.out });
 
             if (watch) await resolver.watch(mode);
             else await resolver.rewritePaths(mode);
-        } catch (error: any) { this.out.error(`&C1${error.message || error}`); }
-        finally { this.out.groupEnd(); }
+        } finally { this.out.groupEnd(); }
     }
-    public async commandSync(command: string, args: string[]) {
+    public async commandSync(command: string, args: string[], flags: Utils.FlagMap = {}) {
         try {
             this.out.group(Utils.newGroup('#FFB4DC'));
             this.out.info(`Synchronizing configurations...`);
 
-            const useCDN = args.includes('--cdn');
+            const useCDN = flags['--cdn'] !== undefined;
             const mode: PathResolver.Mode = useCDN ? 'cdn' : 'local';
             
             
             const config = await Config.load(this.configPath);
-            const resolver = new PathResolver(config, { logger: this.out });
+            const resolver = new PathResolver(config.data, this.projectRoot, { logger: this.out });
             
             const tsconfigFile = config.data.tsconfig;
             const importMapFile = config.data.importmap;
@@ -224,8 +216,7 @@ export class DepFlowCLI extends DebugUI {
             } else this.out.warn(`No import map file specified in configuration. Skipping import map synchronization.`);
 
             this.out.info(`&C2Successfully synced all configurations.`);
-        } catch (error) { this.out.error(`&C1Error during sync: ${error}`); }
-        finally { this.out.groupEnd(); }
+        } finally { this.out.groupEnd(); }
     }
     /**
      * Converts the depflow config file between JSON and YAML.
@@ -250,9 +241,10 @@ export class DepFlowCLI extends DebugUI {
             await config.save(outPath);
 
             this.out.info(`&C2Converted &C4${Path.fileName(input)} &C7→&R &C4${Path.fileName(outPath)} &C2(&C3${to.toUpperCase()}&C2).`);
-        } catch (error: any) { this.out.error(`&C1${error.message || error}`); }
-        finally { this.out.groupEnd(); }
+        } finally { this.out.groupEnd(); }
     }
 }
-export namespace DepFlowCLI {}
+export namespace DepFlowCLI {
+    export type Exec = (this: DepFlowCLI, command: string, args: string[], flags: Utils.FlagMap) => Promise<void> | void;
+}
 export default DepFlowCLI;

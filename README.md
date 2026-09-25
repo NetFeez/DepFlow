@@ -123,13 +123,13 @@ Below is an example adapted from a real project configuration. Use it as a templ
 
 ## CLI Reference
 
-Use the distribution script in `build/cli/bin.js` or install the package globally.
+Use the distribution script in `dist/cli/bin.js` or install the package globally.
 
 - `install`: Clone, build and extract artifacts for all dependencies in your config.
 - `sync`: Generate/update `tsconfig` paths and browser `importmap` according to `resolver` entries.
 - `list`: Show configured dependencies and their status.
 
-Use `node ./build/cli/bin.js <command> --flow <config>` when running locally from the repository.
+Use `node ./dist/cli/bin.js <command> --flow <config>` when running locally from the repository.
 
 ### Commands
 

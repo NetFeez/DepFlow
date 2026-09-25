@@ -65,7 +65,7 @@ export class Builder {
             const mapper = Builder.replacer(map);
             const replacer = Builder.replacer(transform);
 
-            const destination = Path.isAbsolute(to) ? to : Path.join(Path.cwd, to);
+            const destination = Path.isAbsolute(to) ? to : Path.join(this.cwd, to);
             this.logger?.log(`&C7Extracting &C3${from}&C7 to &C3${to}&C7...`);
             
             await File.smartProcess(from, destination, {

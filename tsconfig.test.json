@@ -1,0 +1,15 @@
+{
+    "extends": "./tsconfig.depflow.json",
+    "compilerOptions": {
+        "types": [ "node" ],
+        "declaration": true,
+        "noEmitOnError": true,
+        "outDir": "dist-test",
+        "rootDir": ".",
+        "paths": {
+            "@TestSuite/*": ["./tests/TestSuite/*"]
+        }
+    },
+    "include": ["./src/**/*.ts", "./tests/**/*.ts"],
+    "exclude": ["./tests/types"]
+}

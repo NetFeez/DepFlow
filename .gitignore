@@ -4,6 +4,8 @@
 # Build setting
 **/dist/
 **/dist-*/
+**/*.tsbuildinfo
+package-lock.json
 
 # Hidden files, logging and environment files
 **/.**

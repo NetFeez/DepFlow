@@ -12,10 +12,9 @@ import Utils from '../Utils.js';
 import PathRewriter from './PathRewriter.js';
 import AliasCompiler from './AliasCompiler.js';
 import Async from "@netfeez/common-node/Async.js";
-import Config from '../../config/Config.js';
+import schema from '../../schema/schema.js';
 
 export class PathResolver {
-    public static readonly PROJECT_ROOT = process.cwd();
     public static readonly EXTENSIONS = ['.js', '.ts', '.jsx', '.tsx'];
 
     protected readonly logger: Logger;
@@ -24,18 +23,19 @@ export class PathResolver {
     public readonly aliases: AliasCompiler.CompiledAlias[];
 
     public constructor(
-        public readonly config: Config,
+        data: schema.Config,
+        projectRoot: string,
         public readonly options: PathResolver.Options = {},
     ) {
         this.logger = options.logger || new Logger({ name: 'PATH-RW' });
         
-        const outDir = config.data.outDir || 'build';
+        const outDir = data.outDir;
         this.outDir = !Path.isAbsolute(outDir)
-            ? Path.resolve(PathResolver.PROJECT_ROOT, outDir)
+            ? Path.resolve(projectRoot, outDir)
             : outDir;
 
-        this.aliases = new AliasCompiler(PathResolver.PROJECT_ROOT).compile(config.data);
-        this.rewriter = new PathRewriter(this.aliases, PathResolver.PROJECT_ROOT);
+        this.aliases = new AliasCompiler(projectRoot).compile(data);
+        this.rewriter = new PathRewriter(this.aliases, projectRoot);
     }
     /**
      * Resolves and rewrites paths in built files based on the provided mode (local or CDN).

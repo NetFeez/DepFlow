@@ -1,14 +1,10 @@
 {
+    "files": [],
+    "references": [
+        { "path": "./tsconfig.depflow.json" },
+        { "path": "./tsconfig.test.json" }
+    ],
     "compilerOptions": {
-        "target": "EsNext",
-        "module": "NodeNext",
-        "moduleResolution": "NodeNext",
-        "declaration": true,
-        "sourceMap": true,
-        "strict": true,
-        "outDir": "dist",
-        "rootDir": "src",
-        "types": [ "node" ]
-    },
-    "include": [ "src/**/*.ts" ]
+        "incremental": false,
+    }
 }
