@@ -3,6 +3,7 @@
  * @description Runs a single shell command in an existing child process, capturing its output and exit status.
  * @license Apache-2.0
  */
+
 import { ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 
 import { Events } from "@netfeez/common";

@@ -37,7 +37,7 @@ export class GitDependency extends Dependency implements GitDependency.Data {
         return path;
     }
     public async install(): Promise<void> {
-        this.logger?.group(Group.newGroup('#00B4FF'));
+        this.logger?.group(Group.create('#00B4FF'));
         if (await File.exists(this.folder)) {
             this.logger?.log(`&C3Repository already exists, pulling latest changes...`);
             await Git.pull(this.folder, { logger: this.logger ?? undefined });

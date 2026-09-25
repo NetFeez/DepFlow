@@ -21,7 +21,7 @@ export class Builder {
         this.logger = info.logger || null;
     }
     public async run(): Promise<void> {
-        this.logger?.group(Group.newGroup('#00FFB4'));
+        this.logger?.group(Group.create('#00FFB4'));
         
         for (const step of this.pipeline) {
             if ('run' in step && step.run) {

@@ -35,7 +35,7 @@ export class NpmDependency extends Dependency implements NpmDependency.Data {
     }
 
     public async install(): Promise<void> {
-        this.logger?.group(Group.newGroup('#00B4FF'));
+        this.logger?.group(Group.create('#00B4FF'));
         this.logger?.log(`&C5Using npm to install &C6${this.name}&C5...`);
         const identifier = `${this.name}@${this.version}`;
         const task = new Task(this.flowFolder, [

@@ -50,7 +50,7 @@ export class DepFlowCLI extends DebugUI {
         try {
             let [repo, name] = args;
 
-            this.out.group(Group.newGroup('#FFB4DC'));
+            this.out.group(Group.create('#FFB4DC'));
             this.out.info(`Adding dependency...`);
 
             Validator.validateRepo(repo);
@@ -69,7 +69,7 @@ export class DepFlowCLI extends DebugUI {
         try {
             const [ identifier ] = args;
 
-            this.out.group(Group.newGroup('#FFB4DC'));            
+            this.out.group(Group.create('#FFB4DC'));            
             if (!identifier) throw new Error('Usage: dep remove <name> | <repo_url>');
 
             const config = await Config.load(this.configPath);
@@ -89,7 +89,7 @@ export class DepFlowCLI extends DebugUI {
     }
     public async commandInstall(command: string, args: string[]) {
         try {
-            this.out.group(Group.newGroup('#FFB4DC'));
+            this.out.group(Group.create('#FFB4DC'));
 
             const config = await Config.load(this.configPath);
             const gitDependencies = config.data.dependencies;
@@ -105,7 +105,7 @@ export class DepFlowCLI extends DebugUI {
             this.out.info(`&C5Installing dependencies...`);
             for (const dep of gitTargets) {
                 try {
-                    this.out.group(Group.newGroup('#FFB4DC'));
+                    this.out.group(Group.create('#FFB4DC'));
                     this.out.info(`&C5Installing &C6"${dep.name}" &C5from &C6${dep.repo}&C5...`);
                     this.out.line();
 
@@ -119,7 +119,7 @@ export class DepFlowCLI extends DebugUI {
 
             for (const dep of npmTargets) {
                 try {
-                    this.out.group(Group.newGroup('#FFB4DC'));
+                    this.out.group(Group.create('#FFB4DC'));
                     this.out.info(`&C5Installing npm dependency &C6"${dep.name}" &C5version &C6${dep.version}&C5...`);
                     this.out.line();
 
@@ -139,7 +139,7 @@ export class DepFlowCLI extends DebugUI {
             const [actionName] = args;
             if (!actionName) throw new Error('Usage: dep run <action>');
 
-            this.out.group(Group.newGroup('#FFB4DC'));
+            this.out.group(Group.create('#FFB4DC'));
             this.out.info(`&C5Running action &C6${actionName}&C5...`);
 
             const config = await Config.load(this.configPath);
@@ -157,7 +157,7 @@ export class DepFlowCLI extends DebugUI {
         } finally { this.out.groupEnd(); }
     }
     public async list(command: string, args: string[]) {
-        this.out.group(Group.newGroup('#FFB4DC'));
+        this.out.group(Group.create('#FFB4DC'));
         try {
             const config = await Config.load(this.configPath);
             if (config.data.dependencies.length + config.data.npmDependencies.length === 0) {
@@ -172,7 +172,7 @@ export class DepFlowCLI extends DebugUI {
         } finally { this.out.groupEnd(); }
     }
     public async rewritePaths(command: string, args: string[], flags: Flags.FlagMap = {}) {
-        this.out.group(Group.newGroup('#FFB4DC'));
+        this.out.group(Group.create('#FFB4DC'));
         try {
             const config = await Config.load(this.configPath);
             const watch = flags['--watch'] !== undefined || flags['-w'] !== undefined;
@@ -190,7 +190,7 @@ export class DepFlowCLI extends DebugUI {
     }
     public async commandSync(command: string, args: string[], flags: Flags.FlagMap = {}) {
         try {
-            this.out.group(Group.newGroup('#FFB4DC'));
+            this.out.group(Group.create('#FFB4DC'));
             this.out.info(`Synchronizing configurations...`);
 
             const useCDN = flags['--cdn'] !== undefined;
@@ -226,7 +226,7 @@ export class DepFlowCLI extends DebugUI {
      */
     public async convert(command: string, args: string[]) {
         try {
-            this.out.group(Group.newGroup('#FFB4DC'));
+            this.out.group(Group.create('#FFB4DC'));
 
             const to = command === 'json-to-yaml' ? 'yaml' : 'json';
             const input = this.configPath;
