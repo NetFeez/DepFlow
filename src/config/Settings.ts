@@ -213,7 +213,6 @@ export abstract class Settings<S extends Schema<Definition.Object>> {
 
 export namespace Settings {
     export type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;
-    export type ToProcess<S extends Schema<any>> = S['inferToProcess'];
     export type Data<S extends Schema<any>> = S['infer'];
     export type Props<S extends Schema<any>> = Flatten.Object<Extract<S['infer'], Flatten.Document>>;
 

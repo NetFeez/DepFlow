@@ -58,7 +58,5 @@ export const Config = new Schema({
     }
 });
 export type Config = typeof Config.infer;
-export namespace Config {
-    export type toProcess = typeof Config.inferToProcess;
-}
+export namespace Config {}
 export default Config;

@@ -1,13 +1,13 @@
 import type Logger from "@netfeez/vterm";
 
 import type AliasCompiler from "../resolve/AliasCompiler.js";
-import type Builder from "../builder/Builder.js";
+import schema from "../schema/schema.js";
 
 export abstract class Dependency {
     protected readonly logger: Logger | null;
 
     public readonly name: string;
-    public readonly builder: Builder.Builder;
+    public readonly builder: schema.Builder;
     public readonly resolver: AliasCompiler.Resolver;
 
     public constructor(info: Dependency.Info, logger?: Logger | null) {
@@ -31,16 +31,11 @@ export abstract class Dependency {
      * This method should handle the build process, such as compiling code, bundling files, etc.
      */
     public abstract build(): Promise<void>;
-    /**
-     * Resolve the dependency.
-     * This method should handle the resolution process, such as fetching dependencies, resolving versions, etc.
-     */
-    public abstract resolve(): Promise<void>;
 }
 export namespace Dependency {
     export interface Info {
         name: string;
-        builder?: Builder.Builder;
+        builder?: schema.Builder;
         resolver?: AliasCompiler.Resolver;
     }
 }

@@ -13,13 +13,13 @@ import Dependency from './Dependency.js';
 import Builder from '../builder/Builder.js';
 import schema from '../schema/schema.js';
 
-export class GitDependency extends Dependency implements GitDependency.Dependency {
+export class GitDependency extends Dependency implements GitDependency.Data {
     public readonly repo: GitDependency.repo;
     public readonly tag: string;
 
     public constructor(
         public readonly flowFolder: string,
-        dependency: GitDependency.Dependency,
+        dependency: GitDependency.Data,
         logger: Logger | null = null
     ) { super({
             name: dependency.name,
@@ -62,13 +62,11 @@ export class GitDependency extends Dependency implements GitDependency.Dependenc
         });
         await builder.run();
     }
-    public async resolve(): Promise<void> {}
-
 }
 
 export namespace GitDependency {
     export type repo = `https://github.com/${string}/${string}.git` | `git@github.com:${string}/${string}.git`;
-    export type Dependency = schema.Dependency.GitDependency;
+    export type Data = schema.Dependency.GitDependency;
 }
 
 export default GitDependency;

@@ -142,7 +142,6 @@ export class Task extends Events<Task.EventMap> implements Task.FinishData {
 }
 export namespace Task {
     export type Emitter = Events.Emitter<EventMap>;
-    export type InternalEmitter = Events.Emitter<EventMap>;
     export type EventMap = {
         line: [line: string];
         step: [result: string, step: number, time: number ];

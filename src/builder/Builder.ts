@@ -7,7 +7,7 @@ import { File, Path } from "@netfeez/common-node";
 import schema from "../schema/schema.js";
 
 export class Builder {
-    protected readonly pipeline: Builder.Builder = [];
+    protected readonly pipeline: schema.Builder = [];
     protected readonly cwd: string = process.cwd();
     protected readonly logger: Logger | null;
 
@@ -54,8 +54,8 @@ export class Builder {
      * @returns A promise that resolves when the extraction process is complete, or rejects with an error if any issues occur during the file copying or transformation.
      * @throws Will throw an error if any issues occur during the file copying process, such as problems with reading or writing files, or if the provided entry configuration is invalid.
      */
-    protected async runExtractor(entry: string | Builder.Extractor): Promise<void> {
-        const extractor: Builder.Extractor = typeof entry === 'string'
+    protected async runExtractor(entry: string | schema.Extractor): Promise<void> {
+        const extractor: schema.Extractor = typeof entry === 'string'
             ? { '**/*': { to: entry } }
             : entry;
 
@@ -120,11 +120,8 @@ export class Builder {
 }
 export namespace Builder {
     export type Transformer = (str: string) => string;
-    export type Transform = schema.Transform;
-    export type Builder = schema.Builder;
-    export type Extractor = schema.Extractor;
     export interface Info {
-        pipeline: Builder;
+        pipeline: schema.Builder;
         cwd: string;
         logger?: Logger | null;
     }

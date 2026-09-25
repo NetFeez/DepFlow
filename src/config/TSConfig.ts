@@ -1,7 +1,7 @@
 import { Logger } from '@netfeez/vterm';
 import { Path } from '@netfeez/common-node';
 
-import AliasCompiler from '../resolve/AliasCompiler.js';
+import type AliasCompiler from '../resolve/AliasCompiler.js';
 import schema from '../schema/schema.js';
 import Settings from './Settings.js';
 

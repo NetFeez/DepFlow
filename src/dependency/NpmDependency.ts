@@ -7,12 +7,12 @@ import Logger from "@netfeez/vterm";
 import Async from "@netfeez/common-node/Async.js";
 import schema from "../schema/schema.js";
 
-export class NpmDependency extends Dependency implements NpmDependency.Dependency {
+export class NpmDependency extends Dependency implements NpmDependency.Data {
     public version: string;
     
     public constructor(
         public readonly flowFolder: string,
-        dependency: NpmDependency.Dependency,
+        dependency: NpmDependency.Data,
         logger: Logger | null = null
     ) {
         super({
@@ -63,11 +63,8 @@ export class NpmDependency extends Dependency implements NpmDependency.Dependenc
         });
         await builder.run();
     }
-    public async resolve(): Promise<void> {}
-
 }
 export namespace NpmDependency {
-        export type Resolver = schema.Resolver;
-        export type Dependency = schema.Dependency.NpmDependency;
+    export type Data = schema.Dependency.NpmDependency;
 }
 export default NpmDependency;
