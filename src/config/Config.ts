@@ -1,5 +1,5 @@
 /**
- * @author NetFeez <netfeez.dev@gmail.com>
+ * @author NetFeez <netfeez.dev@gmail.com>.
  * @description Depflow main configuration store, persisted as JSON or YAML with generated comments.
  * @license Apache-2.0
  */
@@ -37,5 +37,7 @@ export class Config extends Settings<typeof schema.Config> {
         await JsonSchema.write(dir);
     }
 }
+
+export namespace Config {}
 
 export default Config;

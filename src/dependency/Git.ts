@@ -1,7 +1,12 @@
+/**
+ * @author NetFeez <netfeez.dev@gmail.com>.
+ * @description Runs git clone and pull operations through shell tasks with real-time logging.
+ * @license Apache-2.0
+ */
 import { Async } from "@netfeez/common-node";
+import Logger from "@netfeez/vterm";
 
 import Task from "../task/Task.js";
-import Logger from "@netfeez/vterm";
 
 export class Git {
     protected logger: Logger | null;
@@ -21,9 +26,9 @@ export class Git {
      * It listens for 'line' events to log standard output and 'error' events to log any errors that occur during command execution, including the step at which the error occurred.
      * Once all commands have been executed,
      * it listens for the 'finish' event to determine the overall success of the operation, logging a summary of the results and resolving or rejecting the promise accordingly based on whether any steps failed.
-     * @param repo The URL of the Git repository to clone.
-     * @param path The file system path where the repository should be cloned to.
-     * @param options An object containing optional parameters for the clone operation, including:
+     * @param repo - The URL of the Git repository to clone.
+     * @param path - The file system path where the repository should be cloned to.
+     * @param options - An object containing optional parameters for the clone operation, including:
      *   - tag: An optional Git tag to check out after cloning the repository.
      *   - logger: An optional Logger instance for real-time logging of command output and errors.
      *   - cwd: An optional current working directory to execute the commands from, defaulting to the process's current working directory if not provided.
@@ -43,8 +48,8 @@ export class Git {
      * It then initiates a Task to execute these commands sequentially, providing real-time logging and error handling through the provided Logger instance.
      * The method listens for 'line' events to log standard output and 'error' events to log any errors that occur during command execution, including the step at which the error occurred.
      * Once all commands have been executed, it listens for the 'finish' event to determine the overall success of the operation, logging a summary of the results and resolving or rejecting the promise accordingly based on whether any steps failed.
-     * @param path The file system path to the local Git repository where the pull operation should be performed.
-     * @param options An object containing optional parameters for the pull operation, including:
+     * @param path - The file system path to the local Git repository where the pull operation should be performed.
+     * @param options - An object containing optional parameters for the pull operation, including:
      *   - tag: An optional Git tag to check out after pulling the latest changes.
      *   - logger: An optional Logger instance for real-time logging of command output and errors.
      *   - cwd: An optional current working directory to execute the commands from, defaulting to the process's current working directory if not provided.

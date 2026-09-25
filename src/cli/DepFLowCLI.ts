@@ -1,10 +1,15 @@
+/**
+ * @author NetFeez <netfeez.dev@gmail.com>.
+ * @description Main CLI surface: dependency management commands, builds and config conversions.
+ * @license Apache-2.0
+ */
 import path from "node:path";
 
 import Logger, { DebugUI } from "@netfeez/vterm";
+import { Path } from "@netfeez/common-node";
 
-import { newGroup } from "../task/Group.js";
-import { getRepoName } from "../dependency/RepoName.js";
-import type Flags from "./Flags.js";
+import Group from "../task/Group.js";
+import RepoName from "../dependency/RepoName.js";
 import Validator from "../dependency/Validator.js";
 import GitDependency from "../dependency/GitDependency.js";
 import PathResolver from "../resolve/PathResolver.js";
@@ -14,7 +19,7 @@ import TSConfig from "../config/TSConfig.js";
 import ImportMap from "../config/ImportMap.js";
 import NpmDependency from "../dependency/NpmDependency.js";
 import Builder from "../builder/Builder.js";
-import { Path } from "@netfeez/common-node";
+import type Flags from "./Flags.js";
 
 export class DepFlowCLI extends DebugUI {
     protected readonly projectRoot: string;
@@ -45,11 +50,11 @@ export class DepFlowCLI extends DebugUI {
         try {
             let [repo, name] = args;
 
-            this.out.group(newGroup('#FFB4DC'));
+            this.out.group(Group.newGroup('#FFB4DC'));
             this.out.info(`Adding dependency...`);
 
             Validator.validateRepo(repo);
-            if (!name) name = getRepoName(repo);
+            if (!name) name = RepoName.getRepoName(repo);
 
             const dep = schema.Dependency.GitDependency.process({ name, repo });
 
@@ -64,7 +69,7 @@ export class DepFlowCLI extends DebugUI {
         try {
             const [ identifier ] = args;
 
-            this.out.group(newGroup('#FFB4DC'));            
+            this.out.group(Group.newGroup('#FFB4DC'));            
             if (!identifier) throw new Error('Usage: dep remove <name> | <repo_url>');
 
             const config = await Config.load(this.configPath);
@@ -84,7 +89,7 @@ export class DepFlowCLI extends DebugUI {
     }
     public async commandInstall(command: string, args: string[]) {
         try {
-            this.out.group(newGroup('#FFB4DC'));
+            this.out.group(Group.newGroup('#FFB4DC'));
 
             const config = await Config.load(this.configPath);
             const gitDependencies = config.data.dependencies;
@@ -100,7 +105,7 @@ export class DepFlowCLI extends DebugUI {
             this.out.info(`&C5Installing dependencies...`);
             for (const dep of gitTargets) {
                 try {
-                    this.out.group(newGroup('#FFB4DC'));
+                    this.out.group(Group.newGroup('#FFB4DC'));
                     this.out.info(`&C5Installing &C6"${dep.name}" &C5from &C6${dep.repo}&C5...`);
                     this.out.line();
 
@@ -114,7 +119,7 @@ export class DepFlowCLI extends DebugUI {
 
             for (const dep of npmTargets) {
                 try {
-                    this.out.group(newGroup('#FFB4DC'));
+                    this.out.group(Group.newGroup('#FFB4DC'));
                     this.out.info(`&C5Installing npm dependency &C6"${dep.name}" &C5version &C6${dep.version}&C5...`);
                     this.out.line();
 
@@ -134,7 +139,7 @@ export class DepFlowCLI extends DebugUI {
             const [actionName] = args;
             if (!actionName) throw new Error('Usage: dep run <action>');
 
-            this.out.group(newGroup('#FFB4DC'));
+            this.out.group(Group.newGroup('#FFB4DC'));
             this.out.info(`&C5Running action &C6${actionName}&C5...`);
 
             const config = await Config.load(this.configPath);
@@ -152,7 +157,7 @@ export class DepFlowCLI extends DebugUI {
         } finally { this.out.groupEnd(); }
     }
     public async list(command: string, args: string[]) {
-        this.out.group(newGroup('#FFB4DC'));
+        this.out.group(Group.newGroup('#FFB4DC'));
         try {
             const config = await Config.load(this.configPath);
             if (config.data.dependencies.length + config.data.npmDependencies.length === 0) {
@@ -167,7 +172,7 @@ export class DepFlowCLI extends DebugUI {
         } finally { this.out.groupEnd(); }
     }
     public async rewritePaths(command: string, args: string[], flags: Flags.FlagMap = {}) {
-        this.out.group(newGroup('#FFB4DC'));
+        this.out.group(Group.newGroup('#FFB4DC'));
         try {
             const config = await Config.load(this.configPath);
             const watch = flags['--watch'] !== undefined || flags['-w'] !== undefined;
@@ -185,7 +190,7 @@ export class DepFlowCLI extends DebugUI {
     }
     public async commandSync(command: string, args: string[], flags: Flags.FlagMap = {}) {
         try {
-            this.out.group(newGroup('#FFB4DC'));
+            this.out.group(Group.newGroup('#FFB4DC'));
             this.out.info(`Synchronizing configurations...`);
 
             const useCDN = flags['--cdn'] !== undefined;
@@ -221,7 +226,7 @@ export class DepFlowCLI extends DebugUI {
      */
     public async convert(command: string, args: string[]) {
         try {
-            this.out.group(newGroup('#FFB4DC'));
+            this.out.group(Group.newGroup('#FFB4DC'));
 
             const to = command === 'json-to-yaml' ? 'yaml' : 'json';
             const input = this.configPath;

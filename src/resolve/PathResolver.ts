@@ -1,16 +1,15 @@
 /**
- * @author NetFeez <netfeez.dev@gmail.com>
- * @description Utility for path resolution with Local/CDN support and dual path fixing.
+ * @author NetFeez <netfeez.dev@gmail.com>.
+ * @description Path resolution with Local/CDN support and dual path fixing.
  * @license Apache-2.0
  */
 import FS, { promises as FSP } from 'node:fs';
 
-import { File, Path } from '@netfeez/common-node';
+import { Async, File, Path } from '@netfeez/common-node';
 import { Logger } from "@netfeez/vterm";
 
 import PathRewriter from './PathRewriter.js';
 import AliasCompiler from './AliasCompiler.js';
-import Async from "@netfeez/common-node/Async.js";
 import schema from '../schema/schema.js';
 
 export class PathResolver {
@@ -39,7 +38,7 @@ export class PathResolver {
     /**
      * Resolves and rewrites paths in built files based on the provided mode (local or CDN).
      * It processes all files in the output directory, rewriting import paths according to the configured aliases.
-     * @param mode The resolution mode ('local' or 'cdn') to determine which target paths to use.
+     * @param mode - The resolution mode ('local' or 'cdn') to determine which target paths to use.
      */
     public async rewritePaths(mode: PathResolver.Mode): Promise<void> {
         this.logger.log(`&C2Starting path resolver in &C3${mode} &C2mode for ${this.outDir}...`);
@@ -63,8 +62,8 @@ export class PathResolver {
     /**
      * Processes a single file, rewriting import paths based on the configured aliases and the specified mode (local or CDN).
      * It reads the file content, applies the path rewriting logic, and writes the updated content back to the file system if any changes were made.
-     * @param file The path of the file to process.
-     * @param mode The resolution mode ('local' or 'cdn') to determine which target paths to use for rewriting.
+     * @param file - The path of the file to process.
+     * @param mode - The resolution mode ('local' or 'cdn') to determine which target paths to use for rewriting.
      * @returns A boolean indicating whether the file was modified (true if rewritten, false if no changes were made).
      */
     protected async processFile(file: string, mode: PathResolver.Mode): Promise<boolean> {
@@ -85,7 +84,7 @@ export class PathResolver {
      * Watches the output directory for changes and automatically rewrites paths in modified files based on the configured aliases and specified mode (local or CDN).
      * It sets up a file system watcher that listens for changes in the output directory, and when a relevant file is modified, it triggers the path rewriting process for that file.
      * The method includes debouncing to prevent excessive processing during rapid file changes, ensuring efficient handling of updates while maintaining responsiveness.
-     * @param mode The resolution mode ('local' or 'cdn') to determine which target paths to use for rewriting when changes are detected.
+     * @param mode - The resolution mode ('local' or 'cdn') to determine which target paths to use for rewriting when changes are detected.
      * @returns A promise that resolves when the watcher is set up and running, allowing the application to continue monitoring for changes indefinitely until manually stopped.
      * @throws Will throw an error if there is an issue setting up the file system watcher or processing files, which can be caught by the caller to handle it appropriately.
      */

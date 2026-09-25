@@ -6,18 +6,23 @@
 
 const REPO_REGEX = /^(?:https:\/\/github\.com\/([^/]+)\/([^/.]+)(?:\.git)?|git@github\.com:([^/]+)\/([^/.]+)(?:\.git)?)$/;
 
-/**
- * Extracts the repository name from its URL.
- * @param repo - The repository URL.
- * @returns The repository name.
- */
-export function getRepoName(repo: string): string {
-    const match = repo.match(REPO_REGEX);
-    if (match) {
-        const user = match[1] || match[3];
-        const repoName = match[2] || match[4];
-        return `${user}.${repoName}`;
-    }
+export namespace RepoName {
 
-    throw new Error(`Invalid repository URL: "${repo}"`);
+    /**
+     * Extracts the repository name from its URL.
+     * @param repo - The repository URL.
+     * @returns The repository name.
+     */
+    export function getRepoName(repo: string): string {
+        const match = repo.match(REPO_REGEX);
+        if (match) {
+            const user = match[1] || match[3];
+            const repoName = match[2] || match[4];
+            return `${user}.${repoName}`;
+        }
+
+        throw new Error(`Invalid repository URL: "${repo}"`);
+    }
 }
+
+export default RepoName;

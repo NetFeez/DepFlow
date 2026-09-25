@@ -1,3 +1,8 @@
+/**
+ * @author NetFeez <netfeez.dev@gmail.com>.
+ * @description Executes sequential shell commands as a task, aggregating results, failures and timing.
+ * @license Apache-2.0
+ */
 import { Async } from "@netfeez/common-node";
 import { Events } from "@netfeez/common";
 
@@ -110,8 +115,8 @@ export class Task extends Events<Task.EventMap> implements Task.FinishData {
      * The method uses a unique marker to determine when the command has finished executing, allowing it to capture the complete output before resolving.
      * If an error occurs during execution, it captures the error message and rejects the promise with a descriptive error.
      * This function is essential for running individual build commands as part of the dependency installation process, providing detailed feedback on the execution of each command and ensuring that any issues are properly handled and reported.
-     * @param shell The child process in which to execute the command.
-     * @param cmd The shell command to execute.
+     * @param shell - The child process in which to execute the command.
+     * @param cmd - The shell command to execute.
      * @returns A promise that resolves to an array of string messages indicating the result of the command execution, including any output captured during the process.
      * @throws Will throw an error if the command fails to execute properly, providing details about the failed command and the associated error message.
      */

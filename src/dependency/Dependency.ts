@@ -1,7 +1,12 @@
+/**
+ * @author NetFeez <netfeez.dev@gmail.com>.
+ * @description Base contract for installable dependencies with their build pipeline and resolver.
+ * @license Apache-2.0
+ */
 import type Logger from "@netfeez/vterm";
 
-import type AliasCompiler from "../resolve/AliasCompiler.js";
 import schema from "../schema/schema.js";
+import type AliasCompiler from "../resolve/AliasCompiler.js";
 
 export abstract class Dependency {
     protected readonly logger: Logger | null;

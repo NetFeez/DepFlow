@@ -1,3 +1,8 @@
+/**
+ * @author NetFeez <netfeez.dev@gmail.com>.
+ * @description Root configuration schema: dependencies, resolver, build actions and output paths.
+ * @license Apache-2.0
+ */
 import Schema from '@netfeez/schema';
 import Builder from './Builder.js';
 import Resolver from './Resolver.js';
@@ -42,13 +47,13 @@ export const Config = new Schema({
             type: 'array',
             default: [],
             items: GitDependency.definition,
-            description: 'Git dependencies to clone and build. Can be a list of strings or objects.'
+            description: 'Git dependencies to clone and build, each an object with a name and a repo.'
         },
         npmDependencies: {
             type: 'array',
             default: [],
             items: NpmDependency.definition,
-            description: 'NPM dependencies to install and build. Can be a list of strings or objects.'
+            description: 'NPM dependencies to install and build, each an object with a name and a version.'
         }
     }
 });

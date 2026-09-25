@@ -1,10 +1,16 @@
+/**
+ * @author NetFeez <netfeez.dev@gmail.com>.
+ * @description Runs a single shell command in an existing child process, capturing its output and exit status.
+ * @license Apache-2.0
+ */
 import { ChildProcessWithoutNullStreams, spawn } from "node:child_process";
+
 import { Events } from "@netfeez/common";
 
 export class Command extends Events<Command.EventMap> {
     protected shell: ChildProcessWithoutNullStreams;
     protected command: string;
-    protected activeListeners: { stdout: Command.StdOut, stderr: Command.StdErr } | null = null;
+    protected activeListeners: Command.ActiveListeners | null = null;
 
     public constructor(shell: ChildProcessWithoutNullStreams, command: string) { super();
         this.shell = shell;
@@ -110,6 +116,10 @@ export namespace Command {
         err: [message: string];
         end: [code: number, message: string];
     };
+    export interface ActiveListeners {
+        stdout: StdOut;
+        stderr: StdErr;
+    }
     export interface ShellComponents {
         shell: Shell;
         abort: Abort;

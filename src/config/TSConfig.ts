@@ -1,9 +1,14 @@
+/**
+ * @author NetFeez <netfeez.dev@gmail.com>.
+ * @description Updates and persists TypeScript path mappings from compiled path aliases.
+ * @license Apache-2.0
+ */
 import { Logger } from '@netfeez/vterm';
 import { Path } from '@netfeez/common-node';
 
-import type AliasCompiler from '../resolve/AliasCompiler.js';
 import schema from '../schema/schema.js';
 import Settings from './Settings.js';
+import type AliasCompiler from '../resolve/AliasCompiler.js';
 
 export class TSConfig extends Settings<typeof schema.TSConfig> {
     protected static schema = schema.TSConfig;
@@ -18,7 +23,7 @@ export class TSConfig extends Settings<typeof schema.TSConfig> {
      * It ensures that the compilerOptions and paths properties exist in the tsconfig data, and then iterates through the compiled aliases to construct the appropriate path mappings.
      * For each alias, it calculates the relative path from the project root to the local target and normalizes it. If the alias is a wildcard, it appends '/*' to the target path.
      * Finally, it updates the paths in the tsconfig data with the new mappings, allowing TypeScript to resolve module paths according to the defined aliases.
-     * @param aliases An array of compiled aliases containing alias names, target paths, and wildcard information.
+     * @param aliases - An array of compiled aliases containing alias names, target paths, and wildcard information.
      */
     public updatePaths(aliases: AliasCompiler.CompiledAlias[]): void {
         if (!this.data.compilerOptions) this.data.compilerOptions = {};
@@ -55,7 +60,7 @@ export class TSConfig extends Settings<typeof schema.TSConfig> {
      * Saves the current tsconfig data to a file.
      * It constructs the path to the tsconfig file using the project root and filename, converts the data to a JSON string with proper formatting, and writes it to the file system using the File.write method.
      * The method also includes error handling to log any issues that occur during the save process, ensuring that users are informed of any problems when attempting to save the tsconfig configuration.
-     * @param path The path to the tsconfig file where the data should be saved.
+     * @param path - The path to the tsconfig file where the data should be saved.
      * @returns A promise that resolves when the save operation is complete, or rejects if an error occurs during the process.
      */
     public async save(path: string = this.vPath!): Promise<void> {

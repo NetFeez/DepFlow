@@ -1,3 +1,8 @@
+/**
+ * @author NetFeez <netfeez.dev@gmail.com>.
+ * @description Schema definition for import map files: imports and scope mappings.
+ * @license Apache-2.0
+ */
 import Schema from '@netfeez/schema';
 
 export const ImportMap = new Schema({

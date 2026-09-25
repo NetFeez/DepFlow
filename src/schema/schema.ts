@@ -1,3 +1,8 @@
+/**
+ * @author NetFeez <netfeez.dev@gmail.com>.
+ * @description Aggregates every schema definition under the shared schema namespace.
+ * @license Apache-2.0
+ */
 import _TSConfig from './TSConfig.js';
 import _ImportMap from './ImportMap.js';
 import _Config from './Config/Config.js';

@@ -1,5 +1,5 @@
 /**
- * @author NetFeez <netfeez.dev@gmail.com>
+ * @author NetFeez <netfeez.dev@gmail.com>.
  * @description Abstract schema-backed config store with flattened property access and file persistence (JSON and YAML).
  * @license Apache-2.0
  */

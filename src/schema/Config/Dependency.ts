@@ -1,3 +1,8 @@
+/**
+ * @author NetFeez <netfeez.dev@gmail.com>.
+ * @description Schema definitions for git and npm dependencies.
+ * @license Apache-2.0
+ */
 import Schema from '@netfeez/schema';
 import Builder from './Builder.js';
 import Resolver from './Resolver.js';

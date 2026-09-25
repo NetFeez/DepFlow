@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+/**
+ * @author NetFeez <netfeez.dev@gmail.com>.
+ * @description Command-line entry point: parses arguments and dispatches the invoked command to the CLI.
+ * @license Apache-2.0
+ */
 import DepFlowCLI from "./DepFLowCLI.js";
 import Flags from "./Flags.js";
 

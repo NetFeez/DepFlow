@@ -1,3 +1,8 @@
+/**
+ * @author NetFeez <netfeez.dev@gmail.com>.
+ * @description Schema definitions for build steps: run, extract and transform entries.
+ * @license Apache-2.0
+ */
 import Schema from '@netfeez/schema';
 import { GlobalTransform } from './Transform.js';
 import Extractor from './Extractor.js';

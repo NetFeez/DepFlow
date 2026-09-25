@@ -1,9 +1,14 @@
+/**
+ * @author NetFeez <netfeez.dev@gmail.com>.
+ * @description Updates and persists the import map file from compiled path aliases.
+ * @license Apache-2.0
+ */
 import { Logger } from '@netfeez/vterm';
 import { Path } from '@netfeez/common-node';
 
-import type AliasCompiler from '../resolve/AliasCompiler.js';
 import schema from '../schema/schema.js';
 import Settings from './Settings.js';
+import type AliasCompiler from '../resolve/AliasCompiler.js';
 
 export class ImportMap extends Settings<typeof schema.ImportMap> {
     protected static schema = schema.ImportMap;
@@ -17,8 +22,8 @@ export class ImportMap extends Settings<typeof schema.ImportMap> {
     /**
      * Updates the import map data based on the provided compiled aliases.
      * It constructs an "imports" section where each alias is mapped to its target path.
-     * @param aliases An array of compiled aliases.
-     * @param mode The resolution mode ('local' or 'cdn').
+     * @param aliases - An array of compiled aliases.
+     * @param mode - The resolution mode ('local' or 'cdn').
      */
     public updateImports(aliases: AliasCompiler.CompiledAlias[], mode: 'local' | 'cdn'): void {
         if (!this.data.imports) this.data.imports = {};
@@ -48,7 +53,7 @@ export class ImportMap extends Settings<typeof schema.ImportMap> {
      * Saves the current import map data to a file.
      * It ensures that the directory for the file exists, converts the data to a JSON string with proper formatting, and writes it to the file system using the File.write method.
      * The method also includes logging to inform users when the save operation is successful.
-     * @param path The path to the import map file to save.
+     * @param path - The path to the import map file to save.
      * @returns A promise that resolves when the save operation is complete, or rejects if an error occurs during the process.
      */
     public async save(path: string = this.vPath!): Promise<void> {

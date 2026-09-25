@@ -1,3 +1,8 @@
+/**
+ * @author NetFeez <netfeez.dev@gmail.com>.
+ * @description Rewrites import statements in file content using compiled aliases.
+ * @license Apache-2.0
+ */
 import PATH from "node:path";
 
 import { Path } from "@netfeez/common-node";
@@ -13,9 +18,9 @@ export class PathRewriter {
     /**
      * Rewrites import paths in the given content based on the configured aliases.
      * It detects import statements and replaces alias paths with their resolved targets.
-     * @param content The file content to rewrite.
-     * @param filePath The path of the file being processed (used for relative path calculations).
-     * @param mode The resolution mode ('local' or 'cdn') to determine which target to use.
+     * @param content - The file content to rewrite.
+     * @param filePath - The path of the file being processed (used for relative path calculations).
+     * @param mode - The resolution mode ('local' or 'cdn') to determine which target to use.
      * @returns The rewritten content with resolved import paths.
      */
     public rewrite(content: string, filePath: string, mode: 'local' | 'cdn'): string {

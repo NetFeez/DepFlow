@@ -1,3 +1,8 @@
+/**
+ * @author NetFeez <netfeez.dev@gmail.com>.
+ * @description Schema definitions for file extraction mappings from source globs.
+ * @license Apache-2.0
+ */
 import Schema from '@netfeez/schema';
 import Transform from './Transform.js';
 

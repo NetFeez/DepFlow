@@ -1,5 +1,5 @@
 /**
- * @author NetFeez <netfeez.dev@gmail.com>
+ * @author NetFeez <netfeez.dev@gmail.com>.
  * @description Dependency utility.
  * @license Apache-2.0
  */
@@ -8,7 +8,7 @@ import Logger from "@netfeez/vterm";
 
 import Validator from "./Validator.js";
 import Git from "./Git.js";
-import { newGroup } from "../task/Group.js";
+import Group from "../task/Group.js";
 import Dependency from './Dependency.js';
 import Builder from '../builder/Builder.js';
 import schema from '../schema/schema.js';
@@ -37,7 +37,7 @@ export class GitDependency extends Dependency implements GitDependency.Data {
         return path;
     }
     public async install(): Promise<void> {
-        this.logger?.group(newGroup('#00B4FF'));
+        this.logger?.group(Group.newGroup('#00B4FF'));
         if (await File.exists(this.folder)) {
             this.logger?.log(`&C3Repository already exists, pulling latest changes...`);
             await Git.pull(this.folder, { logger: this.logger ?? undefined });

@@ -1,10 +1,15 @@
-import { File, Path } from "@netfeez/common-node";
+/**
+ * @author NetFeez <netfeez.dev@gmail.com>.
+ * @description NPM dependency: installs a package and builds it with the configured pipeline.
+ * @license Apache-2.0
+ */
+import { Async, File, Path } from "@netfeez/common-node";
+import Logger from "@netfeez/vterm";
+
 import Builder from "../builder/Builder.js";
 import Task from "../task/Task.js";
-import { newGroup } from "../task/Group.js";
+import Group from "../task/Group.js";
 import { Dependency } from "./Dependency.js";
-import Logger from "@netfeez/vterm";
-import Async from "@netfeez/common-node/Async.js";
 import schema from "../schema/schema.js";
 
 export class NpmDependency extends Dependency implements NpmDependency.Data {
@@ -30,7 +35,7 @@ export class NpmDependency extends Dependency implements NpmDependency.Data {
     }
 
     public async install(): Promise<void> {
-        this.logger?.group(newGroup('#00B4FF'));
+        this.logger?.group(Group.newGroup('#00B4FF'));
         this.logger?.log(`&C5Using npm to install &C6${this.name}&C5...`);
         const identifier = `${this.name}@${this.version}`;
         const task = new Task(this.flowFolder, [

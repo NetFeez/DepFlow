@@ -1,3 +1,8 @@
+/**
+ * @author NetFeez <netfeez.dev@gmail.com>.
+ * @description Compiles resolver entries from the configuration into absolute compiled aliases.
+ * @license Apache-2.0
+ */
 import path from 'node:path';
 
 import Utils from './Utils.js';
@@ -9,7 +14,7 @@ export class AliasCompiler {
      * Compiles alias configurations from the provided config object into a structured format for path resolution.
      * It processes both regular and wildcard aliases, resolving local paths to absolute paths based on the project root.
      * The resulting compiled aliases include information about the alias name, whether it's a wildcard, and its target paths for local and CDN usage.
-     * @param config The configuration object containing dependencies with resolver entries to compile into aliases.
+     * @param config - The configuration object containing dependencies with resolver entries to compile into aliases.
      * @returns An array of compiled alias objects ready for use in path resolution.
      */
     public compile(config: schema.Config): AliasCompiler.CompiledAlias[] {
@@ -30,7 +35,7 @@ export class AliasCompiler {
      * Resolves an array of resolver entries into compiled alias objects, handling both string and object target formats.
      * It determines if each alias is a wildcard and resolves local paths to absolute paths based on the project root.
      * The method also extracts type and CDN targets if provided in the resolver entry.
-     * @param resolver An array of resolver entries to process into compiled aliases.
+     * @param resolver - An array of resolver entries to process into compiled aliases.
      * @returns An array of compiled alias objects derived from the resolver entries.
      */
     protected resolve(resolver: AliasCompiler.Resolver): AliasCompiler.CompiledAlias[] {

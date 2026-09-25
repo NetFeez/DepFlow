@@ -1,9 +1,13 @@
+/**
+ * @author NetFeez <netfeez.dev@gmail.com>.
+ * @description Runs dependency build pipelines: shell commands, file extraction and content transformations.
+ * @license Apache-2.0
+ */
+import { Async, File, Path } from "@netfeez/common-node";
 import type Logger from "@netfeez/vterm";
-import { Async } from "@netfeez/common-node";
 
-import { newGroup } from "../task/Group.js";
 import Task from "../task/Task.js";
-import { File, Path } from "@netfeez/common-node";
+import Group from "../task/Group.js";
 import schema from "../schema/schema.js";
 
 export class Builder {
@@ -17,7 +21,7 @@ export class Builder {
         this.logger = info.logger || null;
     }
     public async run(): Promise<void> {
-        this.logger?.group(newGroup('#00FFB4'));
+        this.logger?.group(Group.newGroup('#00FFB4'));
         
         for (const step of this.pipeline) {
             if ('run' in step && step.run) {
@@ -50,7 +54,7 @@ export class Builder {
      * Runs the extraction process based on the provided entry configuration, which can be either a string or an array of extraction entries.
      * It handles the copying of files from the specified source to the target location, applying any necessary path transformations based on the provided replacer configuration.
      * This method is essential for managing the file extraction phase of the build process, allowing for flexible and customizable file handling as defined in the builder configuration.
-     * @param entry A string or an array of extraction entries that define the source, target, and optional path transformation for the extraction process.
+     * @param entry - A string or an array of extraction entries that define the source, target, and optional path transformation for the extraction process.
      * @returns A promise that resolves when the extraction process is complete, or rejects with an error if any issues occur during the file copying or transformation.
      * @throws Will throw an error if any issues occur during the file copying process, such as problems with reading or writing files, or if the provided entry configuration is invalid.
      */
@@ -80,8 +84,8 @@ export class Builder {
     }
     /**
      * Runs a series of shell commands as part of the build process, using a child process to execute the commands and capturing the output for logging. It handles the execution of the commands, providing feedback on the progress and any errors that occur during the process. This method is essential for executing the necessary setup commands defined in the builder configuration, allowing for a flexible and dynamic build process that can accommodate various requirements for different dependencies.
-     * @param commands An array of strings representing the shell commands to be executed as part of the build process.
-     * @param logger An optional Logger instance for logging the output and errors from the command execution.
+     * @param commands - An array of strings representing the shell commands to be executed as part of the build process.
+     * @param logger - An optional Logger instance for logging the output and errors from the command execution.
      * @returns A promise that resolves when the command execution is complete, or rejects with an error if any command fails, allowing callers to handle such scenarios appropriately.
      * @throws Will throw an error if any issues occur during the execution of the commands, such as problems with spawning the child process or if any command returns a non-zero exit code.
      */
@@ -102,7 +106,7 @@ export class Builder {
     }
     /**
      * Creates a string replacement function based on the provided replacer configuration, which can be either a simple string or an object defining a search pattern and replacement string. This method is used to generate a function that can be applied to strings for dynamic transformations during the build process, allowing for flexible and customizable string manipulation as defined in the builder configuration.
-     * @param replacer A configuration for string replacement, which can be either a string (used as a regex pattern) or an object containing a search pattern and a replacement string.
+     * @param replacer - A configuration for string replacement, which can be either a string (used as a regex pattern) or an object containing a search pattern and a replacement string.
      * @returns A function that takes a string as input and returns a new string with the specified replacements applied, based on the provided replacer configuration.
      * @throws Will throw an error if the provided replacer configuration is invalid, such as if it is neither a string nor an object with the required properties.
      */

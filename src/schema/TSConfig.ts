@@ -1,3 +1,8 @@
+/**
+ * @author NetFeez <netfeez.dev@gmail.com>.
+ * @description Schema definitions for tsconfig files: compiler options and path mappings.
+ * @license Apache-2.0
+ */
 import Schema from '@netfeez/schema';
 
 export const CompilerOptions = new Schema({
