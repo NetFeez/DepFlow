@@ -52,7 +52,6 @@ dep sync
 
 DepFlow uses a JSON configuration file describing where to fetch dependencies and how to build and expose them. The minimal structure:
 
-- `flowFolder` (string): folder where DepFlow stores temporary state (default: `.depflow`).
 - `outDir` (string): project output root used by extract rules.
 - `tsconfig` (string|null): optional path to TypeScript `tsconfig.json` to update `compilerOptions.paths`.
 - `importmap` (string|null): optional path to write a browser `importmap`.
@@ -67,7 +66,6 @@ Below is an example adapted from a real project configuration. Use it as a templ
 
 ```json
 {
-    "flowFolder": ".depflow",
     "outDir": ".",
     "tsconfig": "tsconfig.web.json",
     "importmap": "public/importmap.json",

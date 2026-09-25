@@ -39,6 +39,8 @@ export class DepFlowCLI extends DebugUI {
         this.addCommand('json-to-yaml', this.convert, { usage: 'dep json-to-yaml [output.yaml]', description: 'Convert the depflow config file from JSON to YAML.' });
         this.addCommand('yaml-to-json', this.convert, { usage: 'dep yaml-to-json [output.json]', description: 'Convert the depflow config file from YAML to JSON.' });
     }
+    /** Absolute path of the flow directory (`.depflow`) under the project root. **/
+    protected get flowDirectory(): string { return path.join(this.projectRoot, '.depflow'); }
     public async commandAdd(command: string, args: string[]) {
         try {
             let [repo, name] = args;
@@ -70,8 +72,8 @@ export class DepFlowCLI extends DebugUI {
             const npmMatches = config.data.npmDependencies.filter(dep => dep.name === identifier);
             if (gitMatches.length + npmMatches.length === 0) throw new Error(`Dependency "${identifier}" not found.`);
 
-            for (const dep of gitMatches) await new GitDependency(config.data.flowFolder, dep, this.out).uninstall();
-            for (const dep of npmMatches) await new NpmDependency(config.data.flowFolder, dep, this.out).uninstall();
+            for (const dep of gitMatches) await new GitDependency(this.flowDirectory, dep, this.out).uninstall();
+            for (const dep of npmMatches) await new NpmDependency(this.flowDirectory, dep, this.out).uninstall();
 
             config.data.dependencies = config.data.dependencies.filter(dep => dep.name !== identifier && dep.repo !== identifier);
             config.data.npmDependencies = config.data.npmDependencies.filter(dep => dep.name !== identifier);
@@ -102,7 +104,7 @@ export class DepFlowCLI extends DebugUI {
                     this.out.info(`&C5Installing &C6"${dep.name}" &C5from &C6${dep.repo}&C5...`);
                     this.out.line();
 
-                    const dependency = new GitDependency(config.data.flowFolder, dep, this.out);
+                    const dependency = new GitDependency(this.flowDirectory, dep, this.out);
                     await dependency.install();
 
                     this.out.line();
@@ -116,7 +118,7 @@ export class DepFlowCLI extends DebugUI {
                     this.out.info(`&C5Installing npm dependency &C6"${dep.name}" &C5version &C6${dep.version}&C5...`);
                     this.out.line();
 
-                    const dependency = new NpmDependency(config.data.flowFolder, dep, this.out);
+                    const dependency = new NpmDependency(this.flowDirectory, dep, this.out);
                     await dependency.install();
 
                     this.out.line();

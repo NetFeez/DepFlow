@@ -1,14 +1,6 @@
 #!/usr/bin/env node
-import { File } from "@netfeez/common-node";
-
 import DepFlowCLI from "./DepFLowCLI.js";
 import Flags from "./Flags.js";
-import schema from "../schema/schema.js";
-
-async function startupSchemaValidation(flowPath: string) {
-    const jsonSchema = schema.Config.jsonSchema;
-    File.write(`.depflow/schema.json`, JSON.stringify(jsonSchema));
-}
 
 const skip = 2;
 const [commandName, ...argsList] = process.argv.slice(skip);
@@ -19,8 +11,6 @@ const flowTag = flags['--flow'] || flags['-f'] || [];
 const flowPath = flowTag[0] || 'depflow.json';
 
 const cli = new DepFlowCLI(flowPath);
-
-await startupSchemaValidation(flowPath);
 
 try {
     if (commandName !== null) {

@@ -11,11 +11,6 @@ export const Config = new Schema({
             default: '.depflow/schema.json',
             description: 'Path to the JSON Schema describing the configuration. Used by editors and tools to provide validation, autocompletion and other features.'
         },
-        flowFolder: {
-            type: 'string',
-            default: '.depflow',
-            description: 'Folder where dependency flows are stored. Can be relative or absolute. Defaults to ".depflow".'
-        },
         outDir: {
             type: 'string',
             default: 'dist',
