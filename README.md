@@ -38,7 +38,7 @@ Alternatively, add it as a dev-dependency for project-specific usage.
 CLI examples:
 
 ```bash
-# install dependencies defined in .df.json
+# install dependencies defined in depflow.yaml or depflow.json
 dep install
 # --flow filepath.json for use an specific config
 
@@ -144,9 +144,11 @@ The CLI exposes the following commands (all commands accept the global `--flow <
 
 ### Flags
 
-- `--flow <file>`: Specify an alternate configuration file (for example `.df.json` or `depflow.json`). If omitted, the CLI defaults to `depflow.json` in the current working directory.
+- `--flow <file>` / `-f <file>`: Specify an alternate configuration file (for example `.df.json` or `depflow.json`). If omitted, the CLI defaults to `depflow.json` in the current working directory.
 - `--cdn`: When present for `sync` or `rewrite-paths`, instructs the tool to use CDN targets from resolver entries instead of `local` targets when generating the `importmap` or rewriting paths.
 - `--watch` / `-w`: For `rewrite-paths` only — run a file watcher that keeps rewriting paths as files change.
+
+Every token starting with a dash is a flag: short clusters are not expanded (`-abc` is the single flag `-abc`), values can be written as `--flag value` or `--flag=value`, and `--` ends the flags, turning the remaining tokens into positional arguments. An undeclared flag is reported as an error.
 
 Examples:
 

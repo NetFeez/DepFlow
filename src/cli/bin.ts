@@ -4,18 +4,32 @@
  * @description Command-line entry point: parses arguments and dispatches the invoked command to the CLI.
  * @license Apache-2.0
  */
-import DepFlowCLI from "./DepFLowCLI.js";
-import Flags from "./Flags.js";
+import Logger from "@netfeez/vterm";
+
+import DepFlowCLI, { options } from "./DepFLowCLI.js";
+import type Flags from "./Flags.js";
 
 const skip = 2;
 const [commandName, ...argsList] = process.argv.slice(skip);
 
-const { args, flags } = Flags.extractFlags(argsList);
-const flowTag = flags['--flow'] || flags['-f'] || [];
+/**
+ * Reports a failure to the user and terminates the process with a non-zero exit code.
+ * @param out - The logger the failure is reported to.
+ * @param error - The failure, either an error or a message.
+ */
+function fail(out: Logger, error: any): never {
+    out.error(`&C(#FFB4DC)╭─────────────────────────────────────────────`);
+    out.error(`&C(#FFB4DC)│ &C1${error?.message || error}`);
+    out.error(`&C(#FFB4DC)╰─────────────────────────────────────────────`);
+    process.exit(1)
+}
 
-const flowPath = flowTag[0] || 'depflow.json';
+let parsed: Flags.Result<DepFlowCLI.Options>;
+try { parsed = options.parse(argsList); }
+catch (error: any) { fail(new Logger(), error); }
 
-const cli = new DepFlowCLI(flowPath);
+const { args, flags } = parsed;
+const cli = new DepFlowCLI(flags.flow);
 
 try {
     if (commandName !== null) {
@@ -29,8 +43,5 @@ try {
         }
     } else cli.start();
 } catch (error: any) {
-    cli.out.error(`&C(#FFB4DC)╭─────────────────────────────────────────────`);
-    cli.out.error(`&C(#FFB4DC)│ &C1${error?.message || error}`);
-    cli.out.error(`&C(#FFB4DC)╰─────────────────────────────────────────────`);
-    process.exit(1)
+    fail(cli.out, error);
 }

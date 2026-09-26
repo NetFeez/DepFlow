@@ -3,7 +3,6 @@
  * @description Main CLI surface: dependency management commands, builds and config conversions.
  * @license Apache-2.0
  */
-import path from "node:path";
 
 import Logger, { DebugUI } from "@netfeez/vterm";
 import { Path } from "@netfeez/common-node";
@@ -18,20 +17,41 @@ import TSConfig from "../config/TSConfig.js";
 import ImportMap from "../config/ImportMap.js";
 import NpmDependency from "../dependency/NpmDependency.js";
 import Builder from "../builder/Builder.js";
-import type Flags from "./Flags.js";
+import Flags from "./Flags.js";
+
+/** The flags accepted by every command of the CLI. **/
+export const options = new Flags({
+    flow: {
+        type: 'string',
+        default: 'depflow.yml',
+        aliases: ['p', 'f'],
+        description: 'Path to the configuration file the command operates on.'
+    },
+    watch: {
+        type: 'boolean',
+        default: false,
+        aliases: ['w'],
+        description: 'Keeps watching the built files and rewrites their paths on every change.'
+    },
+    cdn: {
+        type: 'boolean',
+        default: false,
+        description: 'Resolves the dependency paths to their CDN target instead of their local one.'
+    }
+});
 
 export class DepFlowCLI extends DebugUI {
     protected readonly projectRoot: string;
     public constructor(
-        public readonly configPath: string = 'depFlow.json'
+        public readonly configPath: string = 'depFlow.yml'
     ) { super();
         this.out = new Logger({
             logger: this.out,
             formatter: { maxMessageLength: 100 }
         })
 
-        const absoluteConfigPath = path.resolve(process.cwd(), this.configPath);
-        this.projectRoot = path.dirname(absoluteConfigPath);
+        const absoluteConfigPath = Path.resolve(process.cwd(), this.configPath);
+        this.projectRoot = Path.dirname(absoluteConfigPath);
 
         this.addCommand('add', this.commandAdd, { usage: 'dep add <repo_url> [name]', description: 'Add a dependency to the configuration file.' });
         this.addCommand('remove', this.commandRemove, { usage: 'dep remove <name> | <repo_url>', description: 'Remove a dependency from the configuration file and uninstall its files.' });
@@ -44,7 +64,7 @@ export class DepFlowCLI extends DebugUI {
         this.addCommand('yaml-to-json', this.convert, { usage: 'dep yaml-to-json [output.json]', description: 'Convert the depflow config file from YAML to JSON.' });
     }
     /** Absolute path of the flow directory (`.depflow`) under the project root. **/
-    protected get flowDirectory(): string { return path.join(this.projectRoot, '.depflow'); }
+    protected get flowDirectory(): string { return Path.join(this.projectRoot, '.depflow'); }
     public async commandAdd(command: string, args: string[]) {
         try {
             let [repo, name] = args;
@@ -170,15 +190,14 @@ export class DepFlowCLI extends DebugUI {
             }
         } finally { this.out.groupEnd(); }
     }
-    public async rewritePaths(command: string, args: string[], flags: Flags.FlagMap = {}) {
+    public async rewritePaths(command: string, args: string[], flags: DepFlowCLI.Options = options.defaults) {
         this.out.group(Group.create('#FFB4DC'));
         try {
+            const { watch, cdn } = flags;
             const config = await Config.load(this.configPath);
-            const watch = flags['--watch'] !== undefined || flags['-w'] !== undefined;
-            const useCDN = flags['--cdn'] !== undefined;
-            const mode: PathResolver.Mode = useCDN ? 'cdn' : 'local';
+            const mode: PathResolver.Mode = cdn ? 'cdn' : 'local';
 
-            this.out.info(`Mode: &C3${useCDN ? 'CDN' : 'Local'}`);
+            this.out.info(`Mode: &C3${cdn ? 'CDN' : 'Local'}`);
             if (watch) this.out.info(`Watcher: &C2Enabled`);
 
             const resolver = new PathResolver(config.data, this.projectRoot, { logger: this.out });
@@ -187,13 +206,13 @@ export class DepFlowCLI extends DebugUI {
             else await resolver.rewritePaths(mode);
         } finally { this.out.groupEnd(); }
     }
-    public async commandSync(command: string, args: string[], flags: Flags.FlagMap = {}) {
+    public async commandSync(command: string, args: string[], flags: DepFlowCLI.Options = options.defaults) {
         try {
             this.out.group(Group.create('#FFB4DC'));
             this.out.info(`Synchronizing configurations...`);
 
-            const useCDN = flags['--cdn'] !== undefined;
-            const mode: PathResolver.Mode = useCDN ? 'cdn' : 'local';
+            const { cdn } = flags;
+            const mode: PathResolver.Mode = cdn ? 'cdn' : 'local';
             
             
             const config = await Config.load(this.configPath);
@@ -201,8 +220,8 @@ export class DepFlowCLI extends DebugUI {
             
             const tsconfigFile = config.data.tsconfig;
             const importMapFile = config.data.importmap;
-            const tsconfigPath = path.join(this.projectRoot, tsconfigFile || 'tsconfig.json');
-            const importMapPath = path.join(this.projectRoot, importMapFile || 'importmap.json');
+            const tsconfigPath = Path.join(this.projectRoot, tsconfigFile || 'tsconfig.json');
+            const importMapPath = Path.join(this.projectRoot, importMapFile || 'importmap.json');
 
             if (tsconfigFile) {
                 const tsconfig = await TSConfig.load(tsconfigPath, { logger: this.out });
@@ -237,7 +256,7 @@ export class DepFlowCLI extends DebugUI {
 
             const config = await Config.load(input);
             const [output] = args;
-            const outPath = output || path.join(this.projectRoot, `${Path.fileName(input, false)}.${to}`);
+            const outPath = output || Path.join(this.projectRoot, `${Path.fileName(input, false)}.${to}`);
             await config.save(outPath);
 
             this.out.info(`&C2Converted &C4${Path.fileName(input)} &C7→&R &C4${Path.fileName(outPath)} &C2(&C3${to.toUpperCase()}&C2).`);
@@ -245,6 +264,9 @@ export class DepFlowCLI extends DebugUI {
     }
 }
 export namespace DepFlowCLI {
-    export type Exec = (this: DepFlowCLI, command: string, args: string[], flags: Flags.FlagMap) => Promise<void> | void;
+    export type Exec = (this: DepFlowCLI, command: string, args: string[], flags: Options) => Promise<void> | void;
+
+    /** The values of the flags accepted by the CLI. **/
+    export type Options = typeof options.infer;
 }
 export default DepFlowCLI;

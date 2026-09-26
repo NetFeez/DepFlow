@@ -6,7 +6,7 @@
 import TestSuite from '@TestSuite/TestSuite.js';
 import { File, Path } from '@netfeez/common-node';
 
-import DepFlowCLI from '../src/cli/DepFLowCLI.js';
+import DepFlowCLI, { options } from '../src/cli/DepFLowCLI.js';
 import Config from '../src/config/Config.js';
 import { createTemp, removeTemp } from './utils.js';
 
@@ -103,6 +103,15 @@ suite.add('add persists the dependency and the editor schema', async (context) =
         context.expect(await File.exists(Path.join(dir, '.depflow', 'schema.json'))).ok();
         context.done();
     } finally { await removeTemp(dir); }
+});
+
+suite.add('parses the command line against the declared options', (context) => {
+    const { args, flags } = options.parse([ 'sync', '-f', 'custom.json', '--cdn' ]);
+    context.expect(args.join(' ')).equals('sync');
+    context.expect(flags.flow).equals('custom.json');
+    context.expect(flags.cdn).equals(true);
+    context.expect(flags.watch).equals(false);
+    context.done();
 });
 
 export default suite;

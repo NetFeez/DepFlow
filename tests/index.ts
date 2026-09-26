@@ -10,6 +10,7 @@ import aliasCompilerSuite from './AliasCompiler.test.js';
 import pathRewriterSuite from './PathRewriter.test.js';
 import configSuite from './Config.test.js';
 import dependencySuite from './Dependency.test.js';
+import flagsSuite from './Flags.test.js';
 import taskSuite from './Task.test.js';
 import cliSuite from './DepFlowCLI.test.js';
 
@@ -19,6 +20,7 @@ const suites: TestSuite[] = [
     pathRewriterSuite,
     configSuite,
     dependencySuite,
+    flagsSuite,
     taskSuite,
     cliSuite
 ];

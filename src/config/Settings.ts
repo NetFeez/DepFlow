@@ -8,7 +8,6 @@ import { File, Path } from '@netfeez/common-node';
 import { Flatten } from '@netfeez/common';
 import Schema, { Definition } from '@netfeez/schema';
 
-
 export abstract class Settings<S extends Schema<Definition.Object>, TDocument = never> {
     /** The schema describing and validating the config. */
     protected static schema: Schema<any>;
