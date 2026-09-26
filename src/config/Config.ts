@@ -3,27 +3,37 @@
  * @description Depflow main configuration store, persisted as JSON or YAML with generated comments.
  * @license Apache-2.0
  */
-import { Document } from '@netfeez/yaml';
+
 import { Path } from '@netfeez/common-node';
+import type { Document } from '@netfeez/yaml';
 
 import schema from '../schema/schema.js';
 import Settings from './Settings.js';
 import JsonSchema from './JsonSchema.js';
+import JsonCodec from './codecs/JsonCodec.js';
+import YamlCodec from './codecs/YamlCodec.js';
 
-export class Config extends Settings<typeof schema.Config> {
+export class Config extends Settings<typeof schema.Config, Document> {
     protected static schema = schema.Config;
 
     /**
-     * Decorates a freshly-created YAML document with the file header and field comments.
-     * @param document - The YAML document to decorate.
+     * The formats of the config file, in resolution order.
+     *
+     * The YAML one carries the header of a generated file; the comments of each key come from the
+     * descriptions of the schema, on their own.
+     * @returns The JSON codec and the YAML codec of the config.
      */
-    protected static comments(document: Document): void {
-        document.header.push(
-            '# Depflow Configuration File',
-            '# You can use the Red Hat extension for JSON schema validation in VSCode: "$schema: .depflow/schema.json"',
-            '', ''
-        );
-        Settings.applyComments(document, Settings.commentsFromSchema(schema.Config));
+    protected static override get codecs(): readonly Settings.AnyCodec[] {
+        return [
+            new JsonCodec(),
+            new YamlCodec(schema.Config, {
+                header: [
+                    '# Depflow Configuration File',
+                    '# You can use the Red Hat extension for JSON schema validation in VSCode: "$schema: .depflow/schema.json"',
+                    '', ''
+                ]
+            })
+        ];
     }
 
     /**
@@ -31,7 +41,7 @@ export class Config extends Settings<typeof schema.Config> {
      * @param path - The path to save the config file to.
      * @returns A promise that resolves when the config and the editor schema have been written.
      **/
-    public override async save(path: string = this.vPath!): Promise<void> {
+    public override async save(path: string = this.path!): Promise<void> {
         const dir = Path.dirname(path);
         await super.save(path);
         await JsonSchema.write(dir);

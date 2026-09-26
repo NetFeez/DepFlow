@@ -1,42 +1,55 @@
 /**
  * @author NetFeez <netfeez.dev@gmail.com>.
- * @description Abstract schema-backed config store with flattened property access and file persistence (JSON and YAML).
+ * @description Abstract schema-backed config store with flattened property access, whose file format lives in a codec that owns the document it preserves.
  * @license Apache-2.0
  */
 
 import { File, Path } from '@netfeez/common-node';
 import { Flatten } from '@netfeez/common';
 import Schema, { Definition } from '@netfeez/schema';
-import Yaml, { Document } from '@netfeez/yaml';
 
 
-export abstract class Settings<S extends Schema<Definition.Object>> {
-    protected vData: Settings.Data<S>;
-    protected vProps: Flatten.Document;
-    protected vYaml: Document | null;
-    protected vPath: string | null;
+export abstract class Settings<S extends Schema<Definition.Object>, TDocument = never> {
+    /** The schema describing and validating the config. */
+    protected static schema: Schema<any>;
 
     /**
-     * The schema describing and validating the config.
+     * The formats this config can be persisted in, in resolution order.
+     *
+     * Declaring the formats is what replaces the implicit "every config is JSON and YAML": a class
+     * that only needs JSON declares only the JSON codec and never reaches a YAML parser.
+     * @returns The codecs of the class, empty when it declares no format at all.
+     *
+     * @remarks The types are widened because a static cannot see the type parameters of its class.
+     * {@link Settings.codec} is the narrowing seam, named {@link Settings.AnyCodec} on purpose.
      */
-    protected static schema: Schema<any>;
+    protected static get codecs(): readonly Settings.AnyCodec[] { return []; }
+
+    protected vData: Settings.Data<S>;
+    protected props: Flatten.Document;
+    protected document: TDocument | null;
+    protected path: string | null;
+
+    /** The formats of the class this instance was built from, the only way it reaches them. **/
+    protected formats: Settings.Formats;
 
     /**
      * Creates the config store.
      * @param data - The processed data to store.
      * @param options - Additional options for the config store.
      */
-    public constructor(data: Settings.Data<S>, options: Settings.Options = {}) {
+    public constructor(data: Settings.Data<S>, options: Settings.Options<TDocument> = {}) {
+        this.formats = new.target;
         this.vData = data;
-        this.vProps = Flatten.object(this.vData);
-        this.vYaml = options.yaml ?? null;
-        this.vPath = options.path ?? null;
+        this.props = Flatten.object(this.vData);
+        this.document = options.document ?? null;
+        this.path = options.path ?? null;
     }
 
     public get data(): Settings.Data<S> { return this.vData; }
     public set data(value: Settings.Data<S>) {
         this.vData = value;
-        this.vProps = Flatten.object(this.vData);
+        this.props = Flatten.object(this.vData);
     }
 
     /**
@@ -44,113 +57,66 @@ export abstract class Settings<S extends Schema<Definition.Object>> {
      * @param path - The path to the config property.
      * @returns The value of the config property at the specified path.
      */
-    public get<T extends keyof Settings.Props<S>>(path: T): Settings.Props<S>[T] {
-        return this.vProps[path];
+    public get<TKey extends keyof Settings.Props<S>>(path: TKey): Settings.Props<S>[TKey] {
+        return this.props[path];
     }
-    public set<T extends keyof Settings.Props<S>>(path: T, value: Settings.Props<S>[T]): void {
-        this.vProps[path] = value;
-        this.vData = Flatten.unObject(this.vProps);
+    public set<TKey extends keyof Settings.Props<S>>(path: TKey, value: Settings.Props<S>[TKey]): void {
+        this.props[path] = value;
+        this.vData = Flatten.unObject(this.props);
     }
     public merge(partial: Settings.DeepPartial<Settings.Data<S>>): void {
         this.vData = Settings.deepMerge(this.vData, partial);
-        this.vProps = Flatten.object(this.vData);
-    }
-
-    /** Converts the config to a JSON string. */
-    public toJson(): string { return JSON.stringify(this.vData, null, 4); }
-
-    /**
-     * Converts the config to a YAML string, preserving untouched formatting and comments.
-     * @returns The YAML text representation of the config.
-     */
-    public toYaml(): string {
-        if (!this.vYaml) {
-            this.vYaml = Yaml.create(<never>this.vData);
-            (this.constructor as unknown as typeof Settings).comments(this.vYaml);
-        }
-        this.vYaml.sync(<never>this.vData);
-        return this.vYaml.dump();
+        this.props = Flatten.object(this.vData);
     }
 
     /**
-     * Saves the config to the configured path.
-     * @param path - The path to save the config file to.
+     * Saves the config to the given path, in the format of its extension.
+     *
+     * The document the config was loaded with is handed to the codec, so untouched keys, comments
+     * and formatting survive the round trip. When the config is saved into another format than it
+     * was loaded from (`json-to-yaml`), there is no document of that format yet, so the codec
+     * creates one from the data and the file is written as if it had always been in that format.
+     * @param path - The path to save the config file to, defaulting to the path it was loaded from.
      * @returns A promise that resolves when the config is saved.
+     * @throws { Error} When no path is given, or the class declares no format for the extension.
      */
-    public save(path: string = this.vPath!): Promise<void> {
+    public async save(path: string = this.path!): Promise<void> {
         if (!path) throw new Error('No path specified for saving the config.');
-        return Settings.save(path, this);
+        const codec = Settings.require(this.formats, path);
+        await File.ensureDir(Path.dirname(path));
+        await File.write(path, codec.encode(this.vData, this.document ?? codec.create(this.vData)), 'utf-8');
     }
-
-    /**
-     * Saves the given config to the given path.
-     * @param path - The path to save the config file to.
-     * @param config - The config to save.
-     * @returns A promise that resolves when the config is saved.
-     */
-    public static async save(path: string, config: Settings<any>): Promise<void> {
-        const ext = Path.extName(path).toLowerCase();
-        const dir = Path.dirname(path);
-        await File.ensureDir(dir);
-        switch (ext) {
-            case '.yaml':
-            case '.yml':  await File.write(path, config.toYaml(), 'utf-8'); return;
-            case '.json': await File.write(path, config.toJson(), 'utf-8'); return;
-            default: throw new Error(`Unsupported config file extension: ${ext}`);
-        }
-    }
-
 
     /**
      * Loads a config from the given path, creating it with defaults when missing.
+     *
+     * The file is read as plain text and nothing more: the codec of the extension decides what that
+     * text means and hands back both the data and the document the format preserves. A file holding
+     * no document at all (missing, blank, or holding nothing but comments) decodes to nothing, and
+     * the config is then built from the defaults the schema resolves, seeded into a fresh document.
      * @param this - The concrete Settings subclass constructor.
      * @param path - The path to the config file.
      * @param options - Options for loading the config.
      * @returns A promise that resolves with the loaded config.
+     * @throws { Error} When the class declares no format for the extension of the path.
      */
-    public static async load<C extends Settings<any>>(this: Settings.Ctor<C>, path: string, options: Settings.LoadOptions = {}): Promise<C> {
-        const self = this as unknown as typeof Settings;
+    public static async load<C extends Settings<any, any>>(this: Settings.Ctor<C>, path: string, options: Settings.LoadOptions = {}): Promise<C> {
         const logger = options.logger;
-        const ext = Path.extName(path).toLowerCase();
-        if (!['.yaml', '.yml', '.json'].includes(ext)) throw new Error(`Unsupported config file extension: ${ext}`);
+        const codec = Settings.require(this, path);
         if (logger) logger.log(`loading config from &C6[${path}]`);
 
-        if (!await File.exists(path)) {
-            if (logger) logger.log(`config file &C6[${path}]&R does not exist, creating it`);
-            const data = self.schema.process({});
-            let yaml: Document | null = null;
-            if (ext === '.yaml' || ext === '.yml') {
-                yaml = Yaml.create(<never>data);
-                self.comments(yaml);
-            }
-            const config = new this(data, { yaml, path });
-            if (options.create) await Settings.save(path, config);
-            if (logger) logger.log(`config file &C6[${path}]&R &C2was created successfully`);
-            return config;
-        }
+        const text = await File.exists(path) ? await File.read(path, 'utf-8') : null;
+        if (text === null && logger) logger.log(`config file &C6[${path}]&R does not exist, creating it`);
 
         try {
-            const content = await File.read(path, 'utf-8');
-            switch (ext) {
-                case '.yaml':
-                case '.yml': {
-                    let data = self.schema.process({});
-                    let yaml: Document;
-                    if (!content.trim()) {
-                        yaml = Yaml.create(<never>data);
-                        self.comments(yaml);
-                    } else {
-                        yaml = Yaml.parse(content);
-                        data = self.schema.processUnknown(yaml.toJS());
-                    }
-                    return new this(data, { yaml, path });
-                }
-                case '.json': {
-                    const data = self.schema.processUnknown(JSON.parse(content));
-                    return new this(data, { path });
-                }
-                default: throw new Error(`Unsupported config file extension: ${ext}`);
+            const source = text === null ? null : codec.decode(text);
+            const data = this.parse(source === null ? {} : source.data);
+            const config = new this(data, { document: source?.document ?? codec.create(data), path });
+            if (text === null) {
+                if (options.create) await config.save();
+                if (logger) logger.log(`config file &C6[${path}]&R &C2was created successfully`);
             }
+            return config;
         } catch (error) {
             if (logger) logger.error(`config file &C6[${path}]&R &C1could not be loaded`);
             throw error;
@@ -158,46 +124,66 @@ export abstract class Settings<S extends Schema<Definition.Object>> {
     }
 
     /**
-     * Hook to decorate a freshly-created YAML document with comments and header lines.
-     * Override in subclasses to enrich generated config files.
-     * @param document - The YAML document to decorate.
+     * Validates the data of a file against the schema, filling in the defaults of whatever is
+     * absent, so that a partial file yields a complete config.
+     * @param data - The data read from the file.
+     * @returns The data of the config, ready to be stored.
+     *
+     * @remarks The return type is widened because a static cannot see the type parameters of its
+     * class. {@link Settings.Ctor} is where a caller of {@link load} gets it back, as the data of
+     * the subclass it asked for.
      */
-    protected static comments(document: Document): void {}
+    public static parse(data: unknown): Settings.Data<any> { return this.schema.processUnknown(data); }
 
-    protected static applyComments(document: Document, comments: Settings.Comments): void {
-        for (const [key, comment] of Object.entries(comments)) {
-            const node = document.get(key);
-            if (!node) continue;
-            const object = typeof comment === 'string' || Array.isArray(comment) ? { lead: comment } : comment;
-            if (object.lead) {
-                const lead = (Array.isArray(object.lead) ? object.lead : [object.lead]);
-                node.meta.lead = lead.map(line => line.startsWith('#') ? line : `# ${line}`);
-            }
-            if (object.inline) node.meta.inline = object.inline.startsWith('#') ? object.inline : `# ${object.inline}`;
-        }
+    /**
+     * The codec this class declares for a file extension.
+     * @param extension - The lower-cased file extension, including the leading dot.
+     * @returns The codec that reads and writes that extension, or `null` when the class declares no
+     * format for it.
+     *
+     * @remarks The types are widened because a static cannot see the type parameters of its class,
+     * as in {@link codecs}.
+     */
+    public static codec(extension: string): Settings.AnyCodec | null {
+        return this.codecs.find(candidate => candidate.extensions.includes(extension)) ?? null;
     }
 
     /**
-     * Builds YAML comments from the descriptions of an object schema definition.
-     * Each description becomes the lead comment of its corresponding top-level key.
-     * @param schema - The schema instance whose definition descriptions are used.
-     * @returns The comments mapping ready to be applied with {@link applyComments}.
+     * The codec of a path, as declared by the class it is asked for.
+     * @param formats - The formats of the class, either its static side or a loaded config.
+     * @param path - The path the config is read from or written to.
+     * @returns The codec of the extension of the path.
+     * @throws { Error } When no format is declared for that extension.
      */
-    protected static commentsFromSchema(schema: Schema): Settings.Comments {
-        const definition = schema.definition as Partial<Definition.Object>;
-        if (definition.type !== 'object' || !definition.keys) return {};
-        const comments: Settings.Comments = {};
-        for (const [key, value] of Object.entries(definition.keys)) {
-            const description = (value as { description?: string }).description;
-            if (!description) continue;
-            comments[key] = description.split('\n').map(line => line.trim());
-        }
-        return comments;
+    private static require(formats: Settings.Formats, path: string): Settings.AnyCodec {
+        const extension = Settings.extension(path);
+        const codec = formats.codec(extension);
+        if (!codec) throw new Error(`Unsupported config file extension: ${extension}`);
+        return codec;
     }
 
+    /**
+     * The lower-cased extension of a path, the form formats are selected by.
+     * @param path - The path to get the extension of.
+     * @returns The lower-cased extension of the path, including the leading dot.
+     */
+    private static extension(path: string): string { return Path.extName(path).toLowerCase(); }
+
+    /**
+     * Checks if a value is a non-null object (not an array).
+     * @param value - The value to check.
+     * @returns `true` if the value is a non-null object, `false` otherwise.
+     */
     private static isObject(value: any): value is Record<string, any> {
         return value !== null && typeof value === 'object' && !Array.isArray(value);
     }
+
+    /**
+     * Merges two objects deeply, recursively merging their properties.
+     * @param target - The object to merge into.
+     * @param source - The object to merge from.
+     * @returns The merged object.
+     */
     private static deepMerge(target: any, source: any): any {
         if (!Settings.isObject(target) || !Settings.isObject(source)) return source;
         const result = { ...target };
@@ -216,11 +202,12 @@ export namespace Settings {
     export type Data<S extends Schema<any>> = S['infer'];
     export type Props<S extends Schema<any>> = Flatten.Object<Extract<S['infer'], Flatten.Document>>;
 
-    export interface Options {
-        yaml?: Document | null;
+    export interface Options<TDocument = never> {
+        /** The document the format of the file preserves, carried across loads and saves. */
+        document?: TDocument | null;
         path?: string | null;
     }
-    export interface LoadOptions extends Options {
+    export interface LoadOptions {
         logger?: Logger;
         create?: boolean;
     }
@@ -230,19 +217,70 @@ export namespace Settings {
         error(...args: any[]): void;
     }
 
-    export interface Ctor<C extends Settings<any>> {
-        new (data: any, options?: Settings.Options): C;
+    /**
+     * A codec with both of its types widened, which is what a static can name: the statics of a
+     * class cannot see the type parameters of that class, so this is the shape a codec is looked up
+     * and carried in, and the only widening in the design.
+     */
+    export type AnyCodec = Settings.Codec<any, any>;
+
+    /**
+     * The formats of a class, as far as a caller needs them: the codec of an extension, or `null`
+     * when the class declares no format for it.
+     *
+     * This is what a config keeps of its own class (its formats) and what a static side exposes
+     * ({@link Settings.Ctor}), so both resolve a format the same way.
+     */
+    export interface Formats {
+        codec(extension: string): Settings.AnyCodec | null;
     }
 
-    export namespace Comments {
-        export interface Object {
-            lead?: string | string[];
-            inline?: string;
-        }
-        export type Entry = string | string[] | Object;
+    /**
+     * What a concrete subclass must expose for {@link load} to build it: its constructor, the
+     * schema behind {@link parse}, and the formats it declares.
+     */
+    export interface Ctor<C extends Settings<any, any>> extends Settings.Formats {
+        new (data: any, options?: Settings.Options<any>): C;
+        parse(data: unknown): Settings.Data<any>;
     }
-    export interface Comments {
-        [key: string]: Comments.Entry;
+
+    /**
+     * A bidirectional text format: it reads the text of a config file, writes it back, and carries
+     * the document of that file — whatever the format keeps around the values — from one to the other.
+     *
+     * @typeParam TDocument - The document the format preserves; `null` for a format that keeps
+     * nothing beyond the data, whose document is the data itself.
+     * @typeParam TData - The data the format renders.
+     */
+    export interface Codec<TDocument, TData> {
+        /** The lower-cased file extensions this codec is selected by, including the leading dot. */
+        readonly extensions: readonly string[];
+        /**
+         * Parses the text of a file into the data it holds and the document that holds it.
+         * @param text - The text of the file.
+         * @returns The data and the document, or `null` when the text holds no document at all.
+         */
+        decode(text: string): Settings.Decoded<TDocument> | null;
+        /**
+         * Creates the document of a file that does not exist yet, holding the given data.
+         * @param data - The data to hold in the new document.
+         * @returns The new document.
+         */
+        create(data: TData): TDocument;
+        /**
+         * Renders the data through the document, keeping whatever the format preserves.
+         * @param data - The data to render.
+         * @param document - The document the data is rendered through.
+         * @returns The text of the file.
+         */
+        encode(data: TData, document: TDocument): string;
+    }
+
+    export interface Decoded<TDocument> {
+        /** The data the file holds, before the schema validates it. */
+        data: unknown;
+        /** The document the file is written through, and written back from. */
+        document: TDocument;
     }
 }
 

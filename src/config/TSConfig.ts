@@ -8,6 +8,7 @@ import { Path } from '@netfeez/common-node';
 
 import schema from '../schema/schema.js';
 import Settings from './Settings.js';
+import JsonCodec from './codecs/JsonCodec.js';
 import type AliasCompiler from '../resolve/AliasCompiler.js';
 
 export class TSConfig extends Settings<typeof schema.TSConfig> {
@@ -18,6 +19,13 @@ export class TSConfig extends Settings<typeof schema.TSConfig> {
         super(data, options);
         this.logger = options.logger || new Logger({ name: 'TS-CFG' });
     }
+
+    /**
+     * The formats of the tsconfig file: JSON only, so it never reaches a YAML parser.
+     * @returns The JSON codec of the file.
+     */
+    protected static override get codecs(): readonly Settings.AnyCodec[] { return [ new JsonCodec() ]; }
+
     /**
      * Updates the paths in the tsconfig data based on the provided compiled aliases.
      * It ensures that the compilerOptions and paths properties exist in the tsconfig data, and then iterates through the compiled aliases to construct the appropriate path mappings.
@@ -29,7 +37,7 @@ export class TSConfig extends Settings<typeof schema.TSConfig> {
         if (!this.data.compilerOptions) this.data.compilerOptions = {};
         if (!this.data.compilerOptions.paths) this.data.compilerOptions.paths = {};
 
-        const projectRoot = Path.dirname(this.vPath!);
+        const projectRoot = Path.dirname(this.path!);
 
         for (const alias of aliases) {
             const key = alias.isWildcard ? `${alias.alias}/*` : alias.alias;
@@ -63,9 +71,9 @@ export class TSConfig extends Settings<typeof schema.TSConfig> {
      * @param path - The path to the tsconfig file where the data should be saved.
      * @returns A promise that resolves when the save operation is complete, or rejects if an error occurs during the process.
      */
-    public async save(path: string = this.vPath!): Promise<void> {
+    public async save(path: string = this.path!): Promise<void> {
         await super.save(path);
-        if (path !== this.vPath) this.vPath = path;
+        if (path !== this.path) this.path = path;
         const filename = Path.fileName(path);
         this.logger.log(`&C2Saved file &C4${filename}&C2 successfully.`);
     }
