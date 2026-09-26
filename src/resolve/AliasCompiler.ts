@@ -5,10 +5,12 @@
  */
 import path from 'node:path';
 
-import Utils from './Utils.js';
 import schema from '../schema/schema.js';
 
 export class AliasCompiler {
+    /** Matches the optional wildcard suffix of an alias or target (`/*` or `/`). */
+    private static readonly WILDCARD_SUFFIX_REGEX = /\/\*?$/;
+
     constructor(private projectRoot: string) {}
     /**
      * Compiles alias configurations from the provided config object into a structured format for path resolution.
@@ -41,27 +43,45 @@ export class AliasCompiler {
     protected resolve(resolver: AliasCompiler.Resolver): AliasCompiler.CompiledAlias[] {
         const result: AliasCompiler.CompiledAlias[] = [];
         for (const [crudeAlias, target] of Object.entries(resolver)) {
-            const isWildcard = Utils.isWildcard(crudeAlias);
-            const alias = Utils.removeWildcardSuffix(crudeAlias);
+            const isWildcard = AliasCompiler.isWildcard(crudeAlias);
+            const alias = AliasCompiler.removeWildcardSuffix(crudeAlias);
 
             const rawLocal = typeof target === 'string' ? target : target.local;
             const localTarget = path.isAbsolute(rawLocal) 
-                ? Utils.removeWildcardSuffix(rawLocal)
-                : path.resolve(this.projectRoot, Utils.removeWildcardSuffix(rawLocal));
+                ? AliasCompiler.removeWildcardSuffix(rawLocal)
+                : path.resolve(this.projectRoot, AliasCompiler.removeWildcardSuffix(rawLocal));
 
             let cdnTarget: string | undefined;
             let typeTarget: string | undefined;
             if (typeof target === 'object') {
                 if (target.type) {
-                    typeTarget = Utils.removeWildcardSuffix(target.type);
+                    typeTarget = AliasCompiler.removeWildcardSuffix(target.type);
                 }
                 if (target.cdn) {
-                    cdnTarget = Utils.removeWildcardSuffix(target.cdn);
+                    cdnTarget = AliasCompiler.removeWildcardSuffix(target.cdn);
                 }
             }
             result.push({ alias, isWildcard, targets: { local: localTarget, type: typeTarget, cdn: cdnTarget } });
         }
         return result;
+    }
+
+    /**
+     * Checks whether an alias string carries the wildcard suffix (`/*` or `/`) that turns it into a mapping.
+     * @param alias - The alias string to check.
+     * @returns True if the alias ends with a wildcard suffix, false otherwise.
+     */
+    private static isWildcard(alias: string): boolean {
+        return this.WILDCARD_SUFFIX_REGEX.test(alias);
+    }
+
+    /**
+     * Strips the wildcard suffix from an alias or target string, leaving its base form.
+     * @param pathStr - The string to normalize (e.g., `components/*` or `utils/`).
+     * @returns The string without its wildcard suffix (e.g., `components` or `utils`).
+     */
+    private static removeWildcardSuffix(pathStr: string): string {
+        return pathStr.replace(this.WILDCARD_SUFFIX_REGEX, '');
     }
 }
 export namespace AliasCompiler {

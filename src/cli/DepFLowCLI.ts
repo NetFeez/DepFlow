@@ -9,8 +9,7 @@ import Logger, { DebugUI } from "@netfeez/vterm";
 import { Path } from "@netfeez/common-node";
 
 import Group from "../task/Group.js";
-import RepoName from "../dependency/RepoName.js";
-import Validator from "../dependency/Validator.js";
+import DepUtils from "../dependency/DepUtils.js";
 import GitDependency from "../dependency/GitDependency.js";
 import PathResolver from "../resolve/PathResolver.js";
 import Config from "../config/Config.js";
@@ -53,8 +52,8 @@ export class DepFlowCLI extends DebugUI {
             this.out.group(Group.create('#FFB4DC'));
             this.out.info(`Adding dependency...`);
 
-            Validator.validateRepo(repo);
-            if (!name) name = RepoName.getRepoName(repo);
+            DepUtils.repo(repo);
+            if (!name) name = DepUtils.getRepoName(repo);
 
             const dep = schema.Dependency.GitDependency.process({ name, repo });
 

@@ -4,22 +4,12 @@
  * @license Apache-2.0
  */
 import { Async } from "@netfeez/common-node";
-import Logger from "@netfeez/vterm";
+
+import type Logger from "@netfeez/vterm";
 
 import Task from "../task/Task.js";
 
 export class Git {
-    protected logger: Logger | null;
-    protected cwd: string;
-    public constructor(
-        protected path: string,
-        protected repo: string,
-        options: Git.RepoOptions
-    ) {
-        const { logger, cwd } = options;
-        this.logger = logger || null;
-        this.cwd = cwd || process.cwd();
-    }
     /**
      * Clones a Git repository from the specified URL to the target path, optionally checking out a specific tag after cloning.
      * The method constructs the necessary commands to perform the clone operation and optionally check out a specified tag, then initiates a Task to execute these commands sequentially.

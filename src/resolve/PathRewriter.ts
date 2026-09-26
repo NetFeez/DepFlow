@@ -12,8 +12,7 @@ import AliasCompiler from "./AliasCompiler.js";
 export class PathRewriter {
     public static readonly IMPORT_REGEX = /(from\s+['"])([^'"]+)(['"])/g;
     constructor(
-        private readonly aliases: AliasCompiler.CompiledAlias[],
-        private readonly projectRoot: string
+        private readonly aliases: AliasCompiler.CompiledAlias[]
     ) {}
     /**
      * Rewrites import paths in the given content based on the configured aliases.

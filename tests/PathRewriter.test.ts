@@ -33,7 +33,7 @@ function rewrite(
 ): string {
     const config = schema.Config.process({ resolver });
     const aliases = new AliasCompiler(projectRoot).compile(config);
-    return new PathRewriter(aliases, projectRoot).rewrite(content, filePath, mode);
+    return new PathRewriter(aliases).rewrite(content, filePath, mode);
 }
 
 /**

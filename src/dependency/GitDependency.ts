@@ -6,7 +6,7 @@
 import { File, Path } from '@netfeez/common-node';
 import Logger from "@netfeez/vterm";
 
-import Validator from "./Validator.js";
+import DepUtils from "./DepUtils.js";
 import Git from "./Git.js";
 import Group from "../task/Group.js";
 import Dependency from './Dependency.js';
@@ -26,7 +26,7 @@ export class GitDependency extends Dependency implements GitDependency.Data {
             builder: dependency.builder,
             resolver: dependency.resolver || {}
         }, logger);
-        Validator.validateRepo(dependency.repo);
+        DepUtils.repo(dependency.repo);
         this.repo = dependency.repo;
         this.tag = dependency.tag;
     }
@@ -68,7 +68,7 @@ export class GitDependency extends Dependency implements GitDependency.Data {
 }
 
 export namespace GitDependency {
-    export type repo = `https://github.com/${string}/${string}.git` | `git@github.com:${string}/${string}.git`;
+    export type repo = DepUtils.Repo;
     export type Data = schema.Dependency.GitDependency;
 }
 

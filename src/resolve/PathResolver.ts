@@ -33,7 +33,7 @@ export class PathResolver {
             : outDir;
 
         this.aliases = new AliasCompiler(projectRoot).compile(data);
-        this.rewriter = new PathRewriter(this.aliases, projectRoot);
+        this.rewriter = new PathRewriter(this.aliases);
     }
     /**
      * Resolves and rewrites paths in built files based on the provided mode (local or CDN).
