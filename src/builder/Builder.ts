@@ -3,7 +3,7 @@
  * @description Runs dependency build pipelines: shell commands, file extraction and content transformations.
  * @license Apache-2.0
  */
-import { Async, File, Path } from "@netfeez/common-node";
+import { File, Path } from "@netfeez/common-node";
 import type Logger from "@netfeez/vterm";
 
 import Task from "../task/Task.js";
@@ -26,7 +26,7 @@ export class Builder {
         for (const step of this.pipeline) {
             if ('run' in step && step.run) {
                 const commands = typeof step.run === 'string' ? [ step.run ] : step.run;
-                await this.runTask(commands, this.cwd, step.maxTimeMs ?? 60000);
+                await this.runTask(commands, this.cwd, { maxTimeMs: step.maxTimeMs, allowFails: step.allowFails });
             }
             if ('extract' in step && step.extract) {
                 await this.runExtractor(step.extract);
@@ -83,26 +83,22 @@ export class Builder {
         }
     }
     /**
-     * Runs a series of shell commands as part of the build process, using a child process to execute the commands and capturing the output for logging. It handles the execution of the commands, providing feedback on the progress and any errors that occur during the process. This method is essential for executing the necessary setup commands defined in the builder configuration, allowing for a flexible and dynamic build process that can accommodate various requirements for different dependencies.
-     * @param commands - An array of strings representing the shell commands to be executed as part of the build process.
-     * @param logger - An optional Logger instance for logging the output and errors from the command execution.
-     * @returns A promise that resolves when the command execution is complete, or rejects with an error if any command fails, allowing callers to handle such scenarios appropriately.
-     * @throws Will throw an error if any issues occur during the execution of the commands, such as problems with spawning the child process or if any command returns a non-zero exit code.
+     * Runs the shell commands of a build step as a Task, reporting their output as it comes.
+     * The verdict of the task is the verdict of the step: it is awaited, never read from an event.
+     * @param commands - The shell commands to run, in order.
+     * @param cwd - The working directory the commands run in.
+     * @param options - The options of the step: its deadline and whether its failures are tolerated.
+     * @returns A promise resolving once the commands ran, or rejecting when the step fails.
+     * @throws { Task.Failure } When the step fails and does not tolerate failures.
      */
-    protected runTask(commands: string[], cwd: string, maxTimeMs: number): Promise<void> {
-        return Async.awaitEvent<void>((done, fail) => {
-            const pollito = new Task(cwd, commands);
-            if (this.logger) {
-                pollito.on('line', (line) => this.logger?.info(`${line}`));
-                pollito.on('error', (msg, step) => this.logger?.error(`&C1[Step ${step}]&C7: &C1${msg}`));
-            }
-            pollito.once('finish', (data) => {
-                if (data.fails > 0) fail(new Error(`Build failed with ${data.fails} failed steps.`));
-                else done();
-            });
-            pollito.start().catch(fail);
-            return () => { pollito.stop(); };
-        }, maxTimeMs);
+    protected async runTask(commands: string[], cwd: string, options: Task.Options): Promise<void> {
+        const task = new Task(cwd, commands, options);
+        if (this.logger) {
+            task.on('line', (line) => this.logger?.info(`${line}`));
+            task.on('err', (line) => this.logger?.error(`${line}`));
+            task.on('error', (msg, step) => this.logger?.error(`&C1[Step ${step}]&C7: &C1${msg}`));
+        }
+        await task.run();
     }
     /**
      * Creates a string replacement function based on the provided replacer configuration, which can be either a simple string or an object defining a search pattern and replacement string. This method is used to generate a function that can be applied to strings for dynamic transformations during the build process, allowing for flexible and customizable string manipulation as defined in the builder configuration.
