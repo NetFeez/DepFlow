@@ -1,21 +1,20 @@
 /**
  * @author NetFeez <netfeez.dev@gmail.com>.
- * @description Runs git clone and pull operations through shell tasks with real-time logging.
+ * @description Runs git clone and pull operations as programs of their own, with real-time logging.
  * @license Apache-2.0
  */
-import { Async } from "@netfeez/common-node";
-
 import type Logger from "@netfeez/vterm";
 
 import Task from "../task/Task.js";
 
+import Dependency from './Dependency.js';
+
 export class Git {
     /**
-     * Clones a Git repository from the specified URL to the target path, optionally checking out a specific tag after cloning.
-     * The method constructs the necessary commands to perform the clone operation and optionally check out a specified tag, then initiates a Task to execute these commands sequentially.
-     * It listens for 'line' events to log standard output and 'error' events to log any errors that occur during command execution, including the step at which the error occurred.
-     * Once all commands have been executed,
-     * it listens for the 'finish' event to determine the overall success of the operation, logging a summary of the results and resolving or rejecting the promise accordingly based on whether any steps failed.
+     * Clones a Git repository from the specified URL to the target path, optionally checking out a
+     * specific tag after cloning.
+     * The repository, the path and the tag are passed as arguments of `git`, never as a script, so
+     * nothing in them can be reinterpreted as another command.
      * @param repo - The URL of the Git repository to clone.
      * @param path - The file system path where the repository should be cloned to.
      * @param options - An object containing optional parameters for the clone operation, including:
@@ -25,55 +24,63 @@ export class Git {
      */
     public static async clone(repo: string, path: string, options: Git.RepoOptions): Promise<void> {
         const { tag, logger, cwd = process.cwd() } = options;
-        const commands = [
-            `git clone ${repo} ${path}`,
-            `cd ${path}`,
+        const instructions: Task.Instruction[] = [
+            { executable: 'git', args: [ 'clone', repo, path ], cwd }
         ];
-        if (tag) commands.push(`git checkout ${tag}`);
-        await this.runTask(commands, { cwd, logger }, 'clone');
+        if (tag) instructions.push({ executable: 'git', args: [ 'checkout', tag ], cwd: path });
+        await this.runTask(instructions, { cwd, logger }, 'clone');
     }
     /**
-     * Performs a 'git pull' operation on the specified repository path, optionally checking out a specific tag after pulling the latest changes.
-     * The method constructs the necessary commands to navigate to the repository path, execute the pull operation, and optionally check out a specified tag.
-     * It then initiates a Task to execute these commands sequentially, providing real-time logging and error handling through the provided Logger instance.
-     * The method listens for 'line' events to log standard output and 'error' events to log any errors that occur during command execution, including the step at which the error occurred.
-     * Once all commands have been executed, it listens for the 'finish' event to determine the overall success of the operation, logging a summary of the results and resolving or rejecting the promise accordingly based on whether any steps failed.
-     * @param path - The file system path to the local Git repository where the pull operation should be performed.
+     * Brings an existing checkout of a repository to the revision that was asked for.
+     *
+     * The objects are fetched first, always, and then the revision is checked out: a tag is a
+     * revision, not a branch, so a checkout that already sits on one has a detached HEAD, where
+     * `git pull` has nothing to pull into and fails. Checking out the requested revision lands on the
+     * very same commit a fresh clone of that revision would.
+     * @param path - The file system path to the local Git repository to bring up to date.
      * @param options - An object containing optional parameters for the pull operation, including:
-     *   - tag: An optional Git tag to check out after pulling the latest changes.
+     *   - tag: An optional Git tag to check out, or the branch to fast forward when it is absent.
      *   - logger: An optional Logger instance for real-time logging of command output and errors.
      *   - cwd: An optional current working directory to execute the commands from, defaulting to the process's current working directory if not provided.
      */
     public static async pull(path: string, options: Git.RepoOptions): Promise<void> {
-        const { tag, logger, cwd = process.cwd() } = options;
-        const commands = [
-            `cd ${path}`,
-            `git pull`
+        const { tag, logger } = options;
+        const instructions: Task.Instruction[] = [
+            { executable: 'git', args: [ 'fetch', '--tags', '--force' ], cwd: path }
         ];
-        if (tag) commands.push(`git checkout ${tag}`);
-        await this.runTask(commands, { cwd, logger }, 'pull');
+        instructions.push(tag
+            ? { executable: 'git', args: [ 'checkout', tag ], cwd: path }
+            : { executable: 'git', args: [ 'pull', '--ff-only' ], cwd: path });
+        await this.runTask(instructions, { logger }, 'pull');
     }
     /**
-     * Executes a series of Git commands as a Task, providing real-time logging and error handling through the provided Logger instance.
-     * The method constructs the necessary commands based on the provided repository URL, target path, and optional tag, then initiates a Task to execute these commands sequentially.
-     * It listens for 'line' events to log standard output and 'error' events to log any errors that occur during command execution, including the step at which the error occurred.
-     * Once all commands have been executed, it listens for the 'finish' event to determine the overall success of the operation, logging a summary of the results and resolving or rejecting the promise accordingly based on whether any steps failed.
+     * Runs the instructions of a Git operation as a Task, reporting their output as it comes.
+     * The verdict of the task is the verdict of the operation: it is awaited, never read from an event.
+     * @param instructions - The git instructions to run.
+     * @param options - An object containing optional parameters for the operation, including:
+     *   - logger: An optional Logger instance for real-time logging of command output and errors.
+     *   - cwd: The working directory of the task, defaulting to the process's current working directory.
+     * @param operation - The name of the operation, used to describe it when it fails.
+     * @returns A promise resolving once every instruction ran.
+     * @throws { Task.Failure } When any of the instructions fails.
      */
-    protected static async runTask(commands: string[], options: Git.ShellOptions, operation: string): Promise<Task.FinishData> {
+    protected static async runTask(instructions: Task.Instruction[], options: Git.ShellOptions, operation: string): Promise<void> {
         const { cwd = process.cwd(), logger } = options;
-        return Async.awaitEvent<Task.FinishData>((done, fail) => {
-            const task = new Task(cwd, commands);
-            if (logger) {
-                task.on('line', logger.info.bind(logger));
-                task.on('error', (msg, step) => { logger.error(`&C6[Step ${step}]&C7: &C1${msg}`); });
-            }
-            task.once('finish', (summary) => {
-                if (summary.fails === 0) done(summary);
-                else fail(new Error(`Git ${operation} failed with ${summary.fails} failed steps.\nErrors:\n${summary.errors.join('\n')}`));
-            });
-            task.start().catch(fail);
-            return () => { task.stop(); };
-        });
+        const task = new Task(cwd, instructions, { maxTimeMs: Dependency.ACQUISITION_TIME_MS });
+        if (logger) Git.report(task, logger, operation);
+        await task.run();
+    }
+    /**
+     * Wires the progress of a task to a logger.
+     * @param task - The task to report.
+     * @param logger - The logger that receives the output of the task.
+     * @param operation - The name of the operation, used to label the steps of the task.
+     * @returns void
+     **/
+    private static report(task: Task, logger: Logger, operation: string): void {
+        task.on('line', (line) => logger.info(line));
+        task.on('err', (line) => logger.error(line));
+        task.on('error', (message, step) => { logger.error(`&C6[${operation} step ${step}]&C7: &C1${message}`); });
     }
 }
 export namespace Git {

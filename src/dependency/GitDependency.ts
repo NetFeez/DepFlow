@@ -3,7 +3,7 @@
  * @description Dependency utility.
  * @license Apache-2.0
  */
-import { File, Path } from '@netfeez/common-node';
+import { File } from '@netfeez/common-node';
 import Logger from "@netfeez/vterm";
 
 import DepUtils from "./DepUtils.js";
@@ -18,10 +18,10 @@ export class GitDependency extends Dependency implements GitDependency.Data {
     public readonly tag: string;
 
     public constructor(
-        public readonly flowFolder: string,
+        flowFolder: string,
         dependency: GitDependency.Data,
         logger: Logger | null = null
-    ) { super({
+    ) { super(flowFolder, {
             name: dependency.name,
             builder: dependency.builder,
             resolver: dependency.resolver || {}
@@ -30,17 +30,15 @@ export class GitDependency extends Dependency implements GitDependency.Data {
         this.repo = dependency.repo;
         this.tag = dependency.tag;
     }
-    /** Get the folder of the dependency */
-    public get folder(): string {
-        let path = Path.join(this.flowFolder, this.name);
-        path = Path.normalize(path);
-        return path;
-    }
+    /** The folder of the checkout, the identity of the dependency inside the flow folder. **/
+    public get folder(): string { return this.resolve(this.name); }
+    /** Whether the checkout of the dependency is in place. **/
+    public async isInstalled(): Promise<boolean> { return File.exists(this.folder); }
     public async install(): Promise<void> {
         this.logger?.group(Group.create('#00B4FF'));
-        if (await File.exists(this.folder)) {
+        if (await this.isInstalled()) {
             this.logger?.log(`&C3Repository already exists, pulling latest changes...`);
-            await Git.pull(this.folder, { logger: this.logger ?? undefined });
+            await Git.pull(this.folder, { tag: this.tag, logger: this.logger ?? undefined });
             this.logger?.log(`&C2Pull completed successfully.`);
         } else {
             this.logger?.log(`&C5Cloning repository from &C6${this.repo}&C5...`);
@@ -52,7 +50,7 @@ export class GitDependency extends Dependency implements GitDependency.Data {
     }
     /** Removes the local clone from the flow folder, if present. **/
     public async uninstall(): Promise<void> {
-        if (!await File.exists(this.folder)) return void this.logger?.log(`&C4No installation found for &C6${this.name}&C4, skipping.`);
+        if (!await this.isInstalled()) return void this.logger?.log(`&C4No installation found for &C6${this.name}&C4, skipping.`);
         this.logger?.log(`&C1Removing &C6${this.name}&C1 from &C4${this.folder}&C1...`);
         await File.remove(this.folder);
     }

@@ -3,7 +3,7 @@
  * @description NPM dependency: installs a package and builds it with the configured pipeline.
  * @license Apache-2.0
  */
-import { Async, File, Path } from "@netfeez/common-node";
+import { File } from "@netfeez/common-node";
 import Logger from "@netfeez/vterm";
 
 import Builder from "../builder/Builder.js";
@@ -14,13 +14,13 @@ import schema from "../schema/schema.js";
 
 export class NpmDependency extends Dependency implements NpmDependency.Data {
     public version: string;
-    
+
     public constructor(
-        public readonly flowFolder: string,
+        flowFolder: string,
         dependency: NpmDependency.Data,
         logger: Logger | null = null
     ) {
-        super({
+        super(flowFolder, {
             name: dependency.name,
             builder: dependency.builder,
             resolver: dependency.resolver || {}
@@ -28,40 +28,33 @@ export class NpmDependency extends Dependency implements NpmDependency.Data {
         this.version = dependency.version;
     }
 
-    public get folder(): string {
-        let path = Path.join(this.flowFolder, 'node_modules', this.name);
-        path = Path.normalize(path);
-        return path;
-    }
+    /** The folder of the package, the identity of the dependency inside the flow folder. **/
+    public get folder(): string { return this.resolve('node_modules', this.name); }
+
+    /** Whether the package is installed in the flow folder. **/
+    public async isInstalled(): Promise<boolean> { return File.exists(this.folder); }
 
     public async install(): Promise<void> {
         this.logger?.group(Group.create('#00B4FF'));
         this.logger?.log(`&C5Using npm to install &C6${this.name}&C5...`);
-        const identifier = `${this.name}@${this.version}`;
+
         const task = new Task(this.flowFolder, [
-            `npm install ${identifier} --prefix ./ --no-save`
-        ]);
-        await Async.awaitEvent<void>((done, fail) => {
-            if (this.logger) {
-                task.on('line', (data) => this.logger?.log(`&C3${data}`));
-                task.on('error', (data) => this.logger?.error(`&C1${data}`));
-            }
-            task.once('finish', (data) => {
-                if (data.fails > 0) fail(new Error(`npm install failed with ${data.fails} failed steps.`));
-                else {
-                    this.logger?.log(`&C2Installation of ${this.name} completed successfully.`);
-                    done();
-                }
-            });
-            task.start().catch(fail);
-            return () => { task.stop(); };
-        });
+            { executable: 'npm', args: [ 'install', `${this.name}@${this.version}`, '--prefix', './', '--no-save' ], cwd: this.flowFolder }
+        ], { maxTimeMs: Dependency.ACQUISITION_TIME_MS });
+        if (this.logger) {
+            task.on('line', (line) => this.logger?.log(`&C3${line}`));
+            task.on('err', (line) => this.logger?.error(`&C1${line}`));
+            task.on('error', (message) => this.logger?.error(`&C1${message}`));
+        }
+        await task.run();
+        this.logger?.log(`&C2Installation of ${this.name} completed successfully.`);
+
         await this.build();
         this.logger?.groupEnd();
     }
     /** Removes the installed npm package folder, if present. **/
     public async uninstall(): Promise<void> {
-        if (!await File.exists(this.folder)) return void this.logger?.log(`&C4No installation found for &C6${this.name}&C4, skipping.`);
+        if (!await this.isInstalled()) return void this.logger?.log(`&C4No installation found for &C6${this.name}&C4, skipping.`);
         this.logger?.log(`&C1Removing &C6${this.name}&C1 from &C4${this.folder}&C1...`);
         await File.remove(this.folder);
     }
