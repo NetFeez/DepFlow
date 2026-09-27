@@ -5,8 +5,6 @@
  */
 import PATH from "node:path";
 
-import { Path } from "@netfeez/common-node";
-
 import AliasCompiler from "./AliasCompiler.js";
 
 export class PathRewriter {
@@ -44,11 +42,20 @@ export class PathRewriter {
             if (isCDN) return `${prefix}${resolvedPath}${suffix}`;
 
             const currentFileDir = PATH.dirname(filePath);
-            let relativeTarget = PATH.relative(currentFileDir, resolvedPath);
-            if (!relativeTarget.startsWith('.')) relativeTarget = `./${relativeTarget}`;
-            
-            return `${prefix}${Path.normalize(relativeTarget)}${suffix}`;
+            const relative = PATH.relative(currentFileDir, resolvedPath);
+            const relativeTarget = relative.startsWith('.') ? relative : `./${relative}`;
+
+            return `${prefix}${PathRewriter.posix(relativeTarget)}${suffix}`;
         });
+    }
+    /**
+     * The specifier of an import, which is never a file system path: the separator it is written with
+     * is the one of the module system, not the one of the machine that wrote it.
+     * @param target - The target of the import, as the file system spells it.
+     * @returns The target written with the separator an import is written with.
+     **/
+    protected static posix(target: string): string {
+        return target.split(PATH.sep).join('/');
     }
 }
 export namespace PathRewriter {}
