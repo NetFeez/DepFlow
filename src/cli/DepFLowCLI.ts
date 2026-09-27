@@ -58,8 +58,8 @@ export class DepFlowCLI extends DebugUI {
         this.addCommand('install', this.commandInstall, { usage: 'dep install [name1 name2 ...]', description: 'Install dependencies. If names are provided, only those dependencies will be installed.' });
         this.addCommand('run', this.commandRun, { usage: 'dep run <script>', description: 'Run a custom action defined in the configuration file.' });
         this.addCommand('list', this.list, { usage: 'dep list', description: 'List all dependencies in the configuration file.' });
-        this.addCommand('rewrite-paths', this.rewritePaths, { usage: 'dep rewrite-paths [--watch] [--cdn]', description: 'Resolve and rewrite paths in built files based on depFlow configuration.' });
-        this.addCommand('sync', this.commandSync, { usage: 'dep sync', description: 'Syncs depFlow.json with tsconfig.json and generates the importmap.'  });
+        this.addCommand('rewrite-paths', this.rewritePaths, { usage: 'dep rewrite-paths [--watch] [--cdn]', description: 'Rewrite the paths of the built files of outDir according to the resolver entries of the configuration.' });
+        this.addCommand('sync', this.commandSync, { usage: 'dep sync', description: 'Write the resolver entries into the paths of the declared tsconfig and into the declared importmap.'  });
         this.addCommand('json-to-yaml', this.convert, { usage: 'dep json-to-yaml [output.yaml]', description: 'Convert the depflow config file from JSON to YAML.' });
         this.addCommand('yaml-to-json', this.convert, { usage: 'dep yaml-to-json [output.json]', description: 'Convert the depflow config file from YAML to JSON.' });
     }
@@ -78,6 +78,8 @@ export class DepFlowCLI extends DebugUI {
             const dep = schema.Dependency.GitDependency.process({ name, repo });
 
             const config = await Config.load(this.configPath);
+            const taken = config.data.dependencies.some(existing => existing.name === dep.name);
+            if (taken) throw new Error(`A dependency named "${dep.name}" already exists, remove it first or add this one with another name.`);
             config.data.dependencies.push(dep);
             await config.save();
 
@@ -183,10 +185,14 @@ export class DepFlowCLI extends DebugUI {
                 this.out.info(`No dependencies found.`);
             }
             for (const dep of config.data.dependencies) {
-                this.out.info(`&C6${dep.name} &C7from &C2${dep.repo}`);
+                const state = await new GitDependency(this.flowDirectory, dep).isInstalled()
+                    ? `&C2installed&7` : `&C3missing&7`;
+                this.out.info(`&C6${dep.name} &C7from &C2${dep.repo} &C7(${state}&C7)`);
             }
             for (const dep of config.data.npmDependencies) {
-                this.out.info(`&C6${dep.name} &C7v&C2${dep.version}`);
+                const state = await new NpmDependency(this.flowDirectory, dep).isInstalled()
+                    ? `&C2installed&7` : `&C3missing&7`;
+                this.out.info(`&C6${dep.name} &C7v&C2${dep.version} &C7(${state}&C7)`);
             }
         } finally { this.out.groupEnd(); }
     }
