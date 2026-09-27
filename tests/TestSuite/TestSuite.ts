@@ -16,6 +16,8 @@ export class TestSuite {
 
     protected vName: string;
     protected vTests: TestSuite.TestEntry[] = [];
+    protected vPasses: number = 0;
+    protected vFails: number = 0;
 
     /**
      * Creates a test suite with a cleaned name and its own logger.
@@ -31,6 +33,12 @@ export class TestSuite {
 
     /** The logger prefix used for suite messages. */
     public get prefix(): string { return `suit:${this.name}`; }
+
+    /** How many cases of this suite passed. */
+    public get passes(): number { return this.vPasses; }
+
+    /** How many cases of this suite failed. */
+    public get fails(): number { return this.vFails; }
 
     //
     // ====== test control methods ======
@@ -51,11 +59,13 @@ export class TestSuite {
      * @returns A promise that resolves to true if all tests passed, or false if any test failed.
      */
     public async run(tests: TestSuite.TestEntry[] = this.vTests): Promise<boolean> {
-        let allPassed = true;
+        this.vPasses = 0;
+        this.vFails = 0;
         for (const test of tests) {
-            allPassed = await this.test(test.description, test.test) && allPassed;
+            if (await this.test(test.description, test.test)) this.vPasses += 1;
+            else this.vFails += 1;
         }
-        return allPassed;
+        return this.vFails === 0;
     }
     
     /**
@@ -64,6 +74,10 @@ export class TestSuite {
      * It also logs the result of the test (passed or failed) based on whether the test context's done method was called with an error or not.
      * @param description - A string describing the test case, which is used for logging purposes to identify the test being executed.
      * @param test - A function that contains the actual test code. This function is executed with a TestContext as its `this` context and as an argument, allowing it to log messages and mark the test as done.
+     *
+     * @remarks An error escaping the test body fails it even when it already reported success: a case
+     * that cleans up after itself in a `finally` and fails there did not do what it claimed, and
+     * counting it as a pass would report a suite that is not the one that ran.
      */
     public async test(description: string, test: TestSuite.Test): Promise<boolean> {
         const logPrefix = '&C(#FFB4DC)'
@@ -72,6 +86,7 @@ export class TestSuite {
         this.logger.info(`${logPrefix}╭─────────────────────────────────────────────`);
         this.logger.info(`${logPrefix}│ &C6${TestSuite.Utils.splitTexts(description, 44).join(`\n${logPrefix}│ &C6`)}`);
         this.logger.info(`${logPrefix}├─────────────────────────────────────────────`);
+        let escaped: boolean = false;
         try {
             await test.call(context, context);
             if (context.passed) {
@@ -80,10 +95,11 @@ export class TestSuite {
                 this.logger.warn(`${logPrefix}│ &C3⚠ Test finished without explicit done()`);
             }
         } catch (error) {
+            escaped = true;
             const stack = error instanceof Error ? error.stack ?? error.message : String(error);
             this.logger.error(`${logPrefix}│ &C1✖ ${stack.split('\n').join(`\n${logPrefix}│ &C1`)}`);
         } finally { this.logger.info(`${logPrefix}╰─────────────────────────────────────────────`); }
-        return context.passed === true;
+        return !escaped && context.passed === true;
     }
 
     //
