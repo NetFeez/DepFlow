@@ -6,6 +6,7 @@
 import Schema from '@netfeez/schema';
 import { GlobalTransform } from './Transform.js';
 import Extractor from './Extractor.js';
+import Defaults from '../Defaults.js';
 
 export const RunEntry = new Schema({
     type: 'object',
@@ -82,7 +83,7 @@ export namespace BuilderEntry {}
 
 export const Builder = new Schema({
     type: 'array',
-    default: [],
+    get default() { return Defaults.array(); },
     items: BuilderEntry.definition,
     description: 'Ordered pipeline of build steps applied when a dependency is built.'
 });

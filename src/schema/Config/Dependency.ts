@@ -6,6 +6,23 @@
 import Schema from '@netfeez/schema';
 import Builder from './Builder.js';
 import Resolver from './Resolver.js';
+import Defaults from '../Defaults.js';
+
+export namespace DependencyName {
+
+    /**
+     * The identities the flow folder reserves for itself, declared once so no source can claim them.
+     */
+    const RESERVED = 'schema\\.json|node_modules';
+
+    /** A single path segment: the identity of a git source, also the name of its checkout folder. */
+    export const GIT: RegExp = new RegExp(`^(?!(${RESERVED})$)[A-Za-z0-9][A-Za-z0-9._-]*$`);
+
+    /** A package name, optionally scoped: the identity of an npm source. */
+    export const NPM: RegExp = new RegExp(`^(?!(${RESERVED})$)@?[A-Za-z0-9][A-Za-z0-9._~-]*(/[A-Za-z0-9][A-Za-z0-9._~-]*)?$`);
+
+}
+export namespace DependencyName {}
 
 export const GitDependency = new Schema({
     type: 'object',
@@ -13,7 +30,8 @@ export const GitDependency = new Schema({
         name: {
             type: 'string',
             required: true,
-            description: 'Unique name used to reference the dependency in flows and path aliases.'
+            pattern: DependencyName.GIT,
+            description: 'Unique name used to reference the dependency in flows and path aliases. It is an identity, not a path: a single alphanumeric segment.'
         },
         repo: {
             type: 'string',
@@ -27,10 +45,12 @@ export const GitDependency = new Schema({
         },
         builder: {
             ...Builder.definition,
+            get default() { return Defaults.array(); },
             description: 'Build pipeline applied after cloning the repository.'
         },
         resolver: {
             ...Resolver.definition,
+            get default() { return Defaults.record(); },
             description: 'Target resolution used to rewrite the dependency paths.'
         }
     }
@@ -44,7 +64,8 @@ export const NpmDependency = new Schema({
         name: {
             type: 'string',
             required: true,
-            description: 'NPM package name to install.'
+            pattern: DependencyName.NPM,
+            description: 'NPM package name to install, optionally scoped.'
         },
         version: {
             type: 'string',
@@ -53,10 +74,12 @@ export const NpmDependency = new Schema({
         },
         builder: {
             ...Builder.definition,
+            get default() { return Defaults.array(); },
             description: 'Build pipeline applied after installing the package.'
         },
         resolver: {
             ...Resolver.definition,
+            get default() { return Defaults.record(); },
             description: 'Target resolution used to rewrite the dependency paths.'
         }
     }

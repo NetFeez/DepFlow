@@ -46,6 +46,31 @@ suite.add('round-trips a YAML config', async (context) => {
     } finally { await removeTemp(dir); }
 });
 
+suite.add('writes the collections of a yaml config in block style', async (context) => {
+    const dir = await createTemp();
+    try {
+        const file = Path.join(dir, 'depflow.yaml');
+        const config = await Config.load(file);
+        config.data.dependencies.push({
+            name: 'alpha',
+            repo: 'https://github.com/netfeez/alpha.git',
+            tag: 'v1',
+            builder: [],
+            resolver: { '@alpha': 'lib' }
+        });
+        config.data.resolver = { '@utils': 'src/utils' };
+        await config.save();
+
+        const text = await File.read(file, 'utf-8');
+        const body = text.slice(text.indexOf('dependencies:'));
+        context.expect(body).includes('\n  -\n');
+        context.expect(body).includes('    name: alpha');
+        context.expect(body.includes('dependencies: [')).equals(false);
+        context.expect(text).includes("resolver:\n  '@utils': src/utils");
+        context.done();
+    } finally { await removeTemp(dir); }
+});
+
 suite.add('refreshes the editor json schema on save', async (context) => {
     const dir = await createTemp();
     try {
@@ -96,6 +121,33 @@ suite.add('anchors the editor json schema under the project root', async (contex
         context.expect(content).equals(JSON.stringify(schema.Config.jsonSchema));
         context.done();
     } finally { await removeTemp(dir); }
+});
+
+suite.add('gives every config its own copy of the default dependencies', async (context) => {
+    const first = schema.Config.process({});
+    const second = schema.Config.process({});
+
+    first.dependencies.push({ name: 'alpha', repo: 'https://github.com/netfeez/alpha.git', tag: 'main', builder: [], resolver: {} });
+    first.resolver.alpha = { local: 'dist' };
+    context.expect(first.dependencies.length).equals(1);
+    context.expect(first.npmDependencies.length).equals(0);
+    context.expect(Object.keys(first.resolver).length).equals(1);
+    context.expect(second.dependencies.length).equals(0);
+    context.expect(Object.keys(second.resolver).length).equals(0);
+    context.done();
+});
+
+suite.add('gives every dependency its own copy of the default pipeline', async (context) => {
+    const first = schema.Dependency.GitDependency.process({ name: 'alpha', repo: 'https://github.com/netfeez/alpha.git' });
+    const second = schema.Dependency.GitDependency.process({ name: 'beta', repo: 'https://github.com/netfeez/beta.git' });
+
+    first.builder.push({ run: 'echo only in alpha', maxTimeMs: 1000, allowFails: false });
+    first.resolver.alpha = { local: 'dist' };
+    context.expect(first.builder.length).equals(1);
+    context.expect(Object.keys(first.resolver).length).equals(1);
+    context.expect(second.builder.length).equals(0);
+    context.expect(Object.keys(second.resolver).length).equals(0);
+    context.done();
 });
 
 export default suite;

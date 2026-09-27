@@ -6,6 +6,7 @@
 import Schema from '@netfeez/schema';
 import Builder from './Builder.js';
 import Resolver from './Resolver.js';
+import Defaults from '../Defaults.js';
 import { GitDependency, NpmDependency } from './Dependency.js';
 
 export const Config = new Schema({
@@ -36,22 +37,23 @@ export const Config = new Schema({
         actions: {
             type: 'object',
             additional: Builder.definition,
-            default: {},
+            get default() { return Defaults.record(); },
             description: 'Named build actions. Each action runs a pipeline of run, extract and transform steps.'
         },
         resolver: {
             ...Resolver.definition,
+            get default() { return Defaults.record(); },
             description: 'Mapping of dependency names to their resolution targets (local file or CDN). Paths are resolved relative to this folder.'
         },
         dependencies: {
             type: 'array',
-            default: [],
+            get default() { return Defaults.array(); },
             items: GitDependency.definition,
             description: 'Git dependencies to clone and build, each an object with a name and a repo.'
         },
         npmDependencies: {
             type: 'array',
-            default: [],
+            get default() { return Defaults.array(); },
             items: NpmDependency.definition,
             description: 'NPM dependencies to install and build, each an object with a name and a version.'
         }

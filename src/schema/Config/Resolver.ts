@@ -4,6 +4,7 @@
  * @license Apache-2.0
  */
 import Schema from '@netfeez/schema';
+import Defaults from '../Defaults.js';
 
 export const TargetOptions = new Schema({
     type: 'object',
@@ -41,7 +42,7 @@ export namespace Target {}
 export const Resolver = new Schema({
     type: 'object',
     required: true,
-    default: {},
+    get default() { return Defaults.record(); },
     additional: Target.definition,
     description: 'Mapping of dependency names to their resolution targets (local file or CDN).'
 });
