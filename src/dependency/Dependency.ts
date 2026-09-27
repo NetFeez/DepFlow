@@ -26,8 +26,21 @@ export abstract class Dependency {
     public readonly builder: schema.Builder;
     public readonly resolver: AliasCompiler.Resolver;
 
+    /**
+     * Creates the dependency over the two roots it works between.
+     * @param flowFolder - The flow directory (`.depflow`) every checkout of the project lives in.
+     * @param projectRoot - The root of the project the artifacts of the dependency are meant to land in.
+     * @param info - The identity, the build pipeline and the resolver entries of the dependency.
+     * @param logger - Where the acquisition and the build of the dependency report to.
+     *
+     * @remarks The two roots are not the same and are not interchangeable: the flow folder owns the working
+     * copy of a dependency, the project root owns what the project consumes. A pipeline reads from the first
+     * and deposits into the second, which is why both travel together instead of one being derived from the
+     * other.
+     */
     public constructor(
         public readonly flowFolder: string,
+        public readonly projectRoot: string,
         info: Dependency.Info,
         logger?: Logger | null
     ) {

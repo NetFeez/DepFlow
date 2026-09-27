@@ -19,9 +19,10 @@ export class GitDependency extends Dependency implements GitDependency.Data {
 
     public constructor(
         flowFolder: string,
+        projectRoot: string,
         dependency: GitDependency.Data,
         logger: Logger | null = null
-    ) { super(flowFolder, {
+    ) { super(flowFolder, projectRoot, {
             name: dependency.name,
             builder: dependency.builder,
             resolver: dependency.resolver || {}
@@ -59,6 +60,7 @@ export class GitDependency extends Dependency implements GitDependency.Data {
         const builder = new Builder({
             pipeline: this.builder,
             cwd: this.folder,
+            projectRoot: this.projectRoot,
             logger: this.logger
         });
         await builder.run();

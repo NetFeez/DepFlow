@@ -57,7 +57,7 @@ A YAML config is read as a document, so key order, indentation and the comments 
 
 The minimal structure:
 
-- `outDir` (string): project output root scanned by `rewrite-paths` (and by the watcher). Defaults to `dist`. Extraction targets are *not* relative to it, see [Builder rules](#builder-rules).
+- `outDir` (string): project output root scanned by `rewrite-paths` (and by the watcher). Defaults to `dist`. Extraction targets are *not* relative to it, they are relative to the project root, see [Builder rules](#builder-rules).
 - `tsconfig` (string|null): optional path to TypeScript `tsconfig.json` to update `compilerOptions.paths`.
 - `importmap` (string|null): optional path to write a browser `importmap`.
 - `actions` (object): named pipelines runnable with `dep run <action>`.
@@ -68,7 +68,7 @@ Each dependency supports `builder` steps (run commands, file extraction, content
 
 ### Example Configuration
 
-Shown as JSON, which the CLI reads and writes just as well as YAML whenever the file is named `.json`. Extraction targets are absolute here, because an `extract` target is resolved against the dependency checkout and not against `outDir`.
+Shown as JSON, which the CLI reads and writes just as well as YAML whenever the file is named `.json`. The extraction targets are shown as absolute paths, which is the only form that survives being copied between machines: a relative one is resolved against the project root, the same as every other relative path of the configuration.
 
 ```json
 {
@@ -136,11 +136,12 @@ A pipeline is an ordered list of steps, each of them exactly one of:
   `maxTimeMs` (deadline in milliseconds, `-1` for no deadline, defaults to `60000`) and `allowFails`
   (whether a failed command is tolerated, defaults to `false`).
 - `extract`: a mapping of source globs to extraction entries, or a destination folder as a shorthand for
-  `**/*` → that folder. An entry is a destination (`to`) plus, optionally, a `map` transformation applied
-  to the destination path and a `transform` transformation applied to the content of the files. Both
-  transformations run against the *relative* path of the matched file, and `to` is resolved against the
-  dependency checkout (an absolute `to` is used as it stands), while `resolver` targets are resolved
-  against the project root.
+  `**/*` → that folder. The globs are matched against the folder the pipeline works in (the dependency
+  checkout, or the project itself for a `dep run` action) and an entry is a destination (`to`) plus,
+  optionally, a `map` transformation applied to the destination path and a `transform` transformation
+  applied to the content of the files. A relative `to` is resolved against the project root and an
+  absolute one is used as it stands, so a pipeline reads from the dependency and deposits into the
+  project. `map` runs against the *relative* path of the matched file, inside the destination.
 - `transform`: a `glob` plus a `search`/`replace` transformation applied in place to the matched files.
 
 Every transformation (`map`, `transform`, and the in-place `transform` step) takes one of two forms, and

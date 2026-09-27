@@ -98,8 +98,8 @@ export class DepFlowCLI extends DebugUI {
             const npmMatches = config.data.npmDependencies.filter(dep => dep.name === identifier);
             if (gitMatches.length + npmMatches.length === 0) throw new Error(`Dependency "${identifier}" not found.`);
 
-            for (const dep of gitMatches) await new GitDependency(this.flowDirectory, dep, this.out).uninstall();
-            for (const dep of npmMatches) await new NpmDependency(this.flowDirectory, dep, this.out).uninstall();
+            for (const dep of gitMatches) await new GitDependency(this.flowDirectory, this.projectRoot, dep, this.out).uninstall();
+            for (const dep of npmMatches) await new NpmDependency(this.flowDirectory, this.projectRoot, dep, this.out).uninstall();
 
             config.data.dependencies = config.data.dependencies.filter(dep => dep.name !== identifier && dep.repo !== identifier);
             config.data.npmDependencies = config.data.npmDependencies.filter(dep => dep.name !== identifier);
@@ -130,7 +130,7 @@ export class DepFlowCLI extends DebugUI {
                     this.out.info(`&C5Installing &C6"${dep.name}" &C5from &C6${dep.repo}&C5...`);
                     this.out.line();
 
-                    const dependency = new GitDependency(this.flowDirectory, dep, this.out);
+                    const dependency = new GitDependency(this.flowDirectory, this.projectRoot, dep, this.out);
                     await dependency.install();
 
                     this.out.line();
@@ -144,7 +144,7 @@ export class DepFlowCLI extends DebugUI {
                     this.out.info(`&C5Installing npm dependency &C6"${dep.name}" &C5version &C6${dep.version}&C5...`);
                     this.out.line();
 
-                    const dependency = new NpmDependency(this.flowDirectory, dep, this.out);
+                    const dependency = new NpmDependency(this.flowDirectory, this.projectRoot, dep, this.out);
                     await dependency.install();
 
                     this.out.line();
@@ -171,6 +171,7 @@ export class DepFlowCLI extends DebugUI {
 
             const builder = new Builder({
                 cwd: this.projectRoot,
+                projectRoot: this.projectRoot,
                 pipeline,
                 logger: this.out
             });
@@ -185,12 +186,12 @@ export class DepFlowCLI extends DebugUI {
                 this.out.info(`No dependencies found.`);
             }
             for (const dep of config.data.dependencies) {
-                const state = await new GitDependency(this.flowDirectory, dep).isInstalled()
+                const state = await new GitDependency(this.flowDirectory, this.projectRoot, dep).isInstalled()
                     ? `&C2installed&7` : `&C3missing&7`;
                 this.out.info(`&C6${dep.name} &C7from &C2${dep.repo} &C7(${state}&C7)`);
             }
             for (const dep of config.data.npmDependencies) {
-                const state = await new NpmDependency(this.flowDirectory, dep).isInstalled()
+                const state = await new NpmDependency(this.flowDirectory, this.projectRoot, dep).isInstalled()
                     ? `&C2installed&7` : `&C3missing&7`;
                 this.out.info(`&C6${dep.name} &C7v&C2${dep.version} &C7(${state}&C7)`);
             }

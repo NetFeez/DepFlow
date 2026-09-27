@@ -83,8 +83,8 @@ suite.add('keeps the folder of a dependency inside the flow folder', async (cont
     const dir = await createTemp();
     try {
         const flow = Path.join(dir, '.depflow');
-        context.expect(new GitDependency(flow, git('omega')).folder).equals(Path.join(flow, 'omega'));
-        context.expect(new NpmDependency(flow, npm('is-number')).folder).equals(Path.join(flow, 'node_modules', 'is-number'));
+        context.expect(new GitDependency(flow, dir, git('omega')).folder).equals(Path.join(flow, 'omega'));
+        context.expect(new NpmDependency(flow, dir, npm('is-number')).folder).equals(Path.join(flow, 'node_modules', 'is-number'));
         context.done();
     } finally { await removeTemp(dir); }
 });
@@ -94,7 +94,7 @@ suite.add('refuses to resolve a name that escapes the flow folder', async (conte
     try {
         const flow = Path.join(dir, '.depflow');
         const escaped = git('omega');
-        const dependency = new GitDependency(flow, escaped);
+        const dependency = new GitDependency(flow, dir, escaped);
         Object.defineProperty(dependency, 'name', { value: '../pwned' });
         try {
             dependency.folder;
@@ -114,7 +114,7 @@ suite.add('refuses to remove a clone outside of the flow folder', async (context
         await File.ensureDir(outside);
         await File.write(Path.join(outside, 'keep.txt'), 'keep');
 
-        const dependency = new GitDependency(flow, git('omega'));
+        const dependency = new GitDependency(flow, dir, git('omega'));
         Object.defineProperty(dependency, 'name', { value: '../precious' });
         try {
             await dependency.uninstall();
@@ -131,8 +131,8 @@ suite.add('reports whether a dependency is installed', async (context) => {
     const dir = await createTemp();
     try {
         const flow = Path.join(dir, '.depflow');
-        const gitDependency = new GitDependency(flow, git('omega'));
-        const npmDependency = new NpmDependency(flow, npm('is-number'));
+        const gitDependency = new GitDependency(flow, dir, git('omega'));
+        const npmDependency = new NpmDependency(flow, dir, npm('is-number'));
         context.expect(await gitDependency.isInstalled()).equals(false);
         context.expect(await npmDependency.isInstalled()).equals(false);
 
@@ -149,7 +149,7 @@ suite.add('clones a repository and checks out its tag', async (context) => {
     try {
         const origin = await createGitFixture(dir, 'v1');
         const flow = Path.join(dir, '.depflow');
-        const dependency = new GitDependency(flow, git('omega', { repo: origin, tag: 'v1' }));
+        const dependency = new GitDependency(flow, dir, git('omega', { repo: origin, tag: 'v1' }));
 
         await dependency.install();
 
@@ -164,7 +164,7 @@ suite.add('checks out the same tag when the clone already exists', async (contex
     try {
         const origin = await createGitFixture(dir, 'v1');
         const flow = Path.join(dir, '.depflow');
-        const dependency = new GitDependency(flow, git('omega', { repo: origin, tag: 'v1' }));
+        const dependency = new GitDependency(flow, dir, git('omega', { repo: origin, tag: 'v1' }));
         await dependency.install();
 
         const work = Path.join(dir, 'work');
@@ -185,7 +185,7 @@ suite.add('moves the checkout to the tag it declares when the declared one chang
     try {
         const origin = await createGitFixture(dir, 'v1');
         const flow = Path.join(dir, '.depflow');
-        const first = new GitDependency(flow, git('omega', { repo: origin, tag: 'v1' }));
+        const first = new GitDependency(flow, dir, git('omega', { repo: origin, tag: 'v1' }));
         await first.install();
         context.expect(await File.read(Path.join(first.folder, 'version.txt'), 'utf-8')).equals('v1');
 
@@ -195,7 +195,7 @@ suite.add('moves the checkout to the tag it declares when the declared one chang
         await run('git', [ 'commit', '-am', 'dev' ], work);
         await run('git', [ 'push', 'origin', 'dev' ], work);
 
-        const second = new GitDependency(flow, git('omega', { repo: origin, tag: 'dev' }));
+        const second = new GitDependency(flow, dir, git('omega', { repo: origin, tag: 'dev' }));
         await second.install();
 
         context.expect(await File.read(Path.join(second.folder, 'version.txt'), 'utf-8')).equals('dev');
@@ -208,7 +208,7 @@ suite.add('runs the build pipeline of a dependency in its checkout', async (cont
     try {
         const origin = await createGitFixture(dir, 'v1');
         const flow = Path.join(dir, '.depflow');
-        const dependency = new GitDependency(flow, git('omega', {
+        const dependency = new GitDependency(flow, dir, git('omega', {
             repo: origin,
             tag: 'v1',
             builder: [ { run: `node -e "require('fs').writeFileSync('built.txt', 'built')"` } ]
@@ -221,12 +221,34 @@ suite.add('runs the build pipeline of a dependency in its checkout', async (cont
     } finally { await removeTemp(dir); }
 });
 
+suite.add('extracts the artifacts of a dependency into the project, not into its checkout', async (context) => {
+    const dir = await createTemp();
+    try {
+        const origin = await createGitFixture(dir, 'v1');
+        const flow = Path.join(dir, '.depflow');
+        const dependency = new GitDependency(flow, dir, git('omega', {
+            repo: origin,
+            tag: 'v1',
+            builder: [
+                { run: `node -e "require('fs').mkdirSync('build', { recursive: true });require('fs').writeFileSync('build/index.js', 'export const value = 1;')"` },
+                { extract: { 'build/**/*.js': { to: 'public/lib/omega', map: '^build/' } } }
+            ]
+        }));
+
+        await dependency.install();
+
+        context.expect(await File.read(Path.join(dir, 'public', 'lib', 'omega', 'index.js'), 'utf-8')).equals('export const value = 1;');
+        context.expect(await File.exists(Path.join(dependency.folder, 'public'))).notOk();
+        context.done();
+    } finally { await removeTemp(dir); }
+});
+
 suite.add('fails the install when the build of the dependency fails', async (context) => {
     const dir = await createTemp();
     try {
         const origin = await createGitFixture(dir, 'v1');
         const flow = Path.join(dir, '.depflow');
-        const dependency = new GitDependency(flow, git('omega', {
+        const dependency = new GitDependency(flow, dir, git('omega', {
             repo: origin,
             tag: 'v1',
             builder: [ { run: 'node -e "process.exit(1)"' } ]
@@ -247,7 +269,7 @@ suite.add('installs a repository from a project whose path has spaces', async (c
     try {
         const origin = await createGitFixture(dir, 'v1');
         const flow = Path.join(dir, 'a flow folder');
-        const dependency = new GitDependency(flow, git('omega', { repo: origin, tag: 'v1' }));
+        const dependency = new GitDependency(flow, dir, git('omega', { repo: origin, tag: 'v1' }));
 
         await dependency.install();
 
@@ -261,7 +283,7 @@ suite.add('fails the install when the repository cannot be cloned', async (conte
     try {
         const flow = Path.join(dir, '.depflow');
         const missing = Path.join(dir, 'no-such-repository.git');
-        const dependency = new GitDependency(flow, git('omega', { repo: missing }));
+        const dependency = new GitDependency(flow, dir, git('omega', { repo: missing }));
 
         try {
             await dependency.install();
@@ -326,7 +348,7 @@ suite.add('git uninstall removes the local clone', async (context) => {
         await File.ensureDir(target);
         await File.write(Path.join(target, 'file.txt'), 'content');
 
-        const dep = new GitDependency(Path.join(dir, '.depflow'), git('test.git'));
+        const dep = new GitDependency(Path.join(dir, '.depflow'), dir, git('test.git'));
         await dep.uninstall();
 
         context.expect(await File.exists(target)).notOk();
@@ -337,7 +359,7 @@ suite.add('git uninstall removes the local clone', async (context) => {
 suite.add('git uninstall is idempotent over a missing clone', async (context) => {
     const dir = await createTemp();
     try {
-        const dep = new GitDependency(Path.join(dir, '.depflow'), git('test.git'));
+        const dep = new GitDependency(Path.join(dir, '.depflow'), dir, git('test.git'));
         await dep.uninstall();
         await dep.uninstall();
         context.done();
@@ -351,7 +373,7 @@ suite.add('npm uninstall removes the installed package folder', async (context) 
         await File.ensureDir(target);
         await File.write(Path.join(target, 'index.js'), 'export {}');
 
-        const dep = new NpmDependency(Path.join(dir, '.depflow'), npm('test-pkg'));
+        const dep = new NpmDependency(Path.join(dir, '.depflow'), dir, npm('test-pkg'));
         await dep.uninstall();
 
         context.expect(await File.exists(target)).notOk();
@@ -362,7 +384,7 @@ suite.add('npm uninstall removes the installed package folder', async (context) 
 suite.add('npm uninstall is idempotent over a missing package', async (context) => {
     const dir = await createTemp();
     try {
-        const dep = new NpmDependency(Path.join(dir, '.depflow'), npm('test-pkg'));
+        const dep = new NpmDependency(Path.join(dir, '.depflow'), dir, npm('test-pkg'));
         await dep.uninstall();
         await dep.uninstall();
         context.done();

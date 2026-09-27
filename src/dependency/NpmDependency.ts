@@ -17,10 +17,11 @@ export class NpmDependency extends Dependency implements NpmDependency.Data {
 
     public constructor(
         flowFolder: string,
+        projectRoot: string,
         dependency: NpmDependency.Data,
         logger: Logger | null = null
     ) {
-        super(flowFolder, {
+        super(flowFolder, projectRoot, {
             name: dependency.name,
             builder: dependency.builder,
             resolver: dependency.resolver || {}
@@ -63,6 +64,7 @@ export class NpmDependency extends Dependency implements NpmDependency.Data {
         const builder = new Builder({
             pipeline: this.builder,
             cwd: this.folder,
+            projectRoot: this.projectRoot,
             logger: this.logger
         });
         await builder.run();

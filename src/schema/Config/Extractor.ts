@@ -13,7 +13,7 @@ export const ExtractorEntry = new Schema({
         to: {
             type: 'string',
             required: true,
-            description: 'Destination folder to which the matched files are copied.'
+            description: 'Destination folder to which the matched files are copied. A relative path is resolved against the project root, an absolute one is used as it stands.'
         },
         map: {
             ...Transform.definition,
@@ -41,7 +41,7 @@ export const Extractor = new Schema({
             ExtractorEntry.definition
         ]
     },
-    description: 'Mapping of source glob patterns to extraction entries, each describing where and how files are extracted.'
+    description: 'Mapping of source glob patterns, relative to the folder the pipeline works in, to extraction entries, each describing where and how files are extracted.'
 });
 export type Extractor = typeof Extractor.infer;
 export namespace Extractor {}

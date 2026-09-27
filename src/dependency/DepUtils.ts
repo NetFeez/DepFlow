@@ -56,8 +56,7 @@ export namespace DepUtils {
      */
     export function repo(repo: unknown): asserts repo is Repo {
         if (typeof repo !== 'string' || !repo.trim()) throw new Error(`Not a clonable git repository: "${repo}".`);
-        if (!CLONEABLE_REGEX.test(repo) || !GIT_SUFFIX_REGEX.test(repo.trim()))
-            throw new Error(`Not a clonable git repository: "${repo}". Pass a repository ending in .git, a URL git can clone, an ssh address or a local path of a repository.`);
+        if (!CLONEABLE_REGEX.test(repo) || !GIT_SUFFIX_REGEX.test(repo.trim())) throw new Error(`Not a clonable git repository: "${repo}". Pass a repository ending in .git, a URL git can clone, an ssh address or a local path of a repository.`);
     }
 
     /**

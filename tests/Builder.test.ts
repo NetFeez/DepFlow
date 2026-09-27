@@ -70,7 +70,7 @@ suite.add('object transform without a replacement removes matches', (context) =>
 suite.add('runs every command of a run step in order', async (context) => {
     const dir = await createTemp();
     try {
-        const builder = new Builder({ cwd: dir, pipeline: pipeline({ run: [ 'node -e "require(\'fs\').writeFileSync(\'one.txt\', \'1\')"', 'node -e "require(\'fs\').writeFileSync(\'two.txt\', \'2\')"' ] }) });
+        const builder = new Builder({ cwd: dir, projectRoot: dir, pipeline: pipeline({ run: [ 'node -e "require(\'fs\').writeFileSync(\'one.txt\', \'1\')"', 'node -e "require(\'fs\').writeFileSync(\'two.txt\', \'2\')"' ] }) });
         await builder.run();
         context.expect(await File.exists(Path.join(dir, 'one.txt'))).ok();
         context.expect(await File.exists(Path.join(dir, 'two.txt'))).ok();
@@ -83,6 +83,7 @@ suite.add('stops the pipeline after a run step that does not tolerate its failur
     try {
         const builder = new Builder({
             cwd: dir,
+            projectRoot: dir,
             pipeline: pipeline(
                 { run: 'node -e "process.exit(1)"' },
                 { run: 'node -e "require(\'fs\').writeFileSync(\'after.txt\', \'after\')"' }
@@ -104,6 +105,7 @@ suite.add('tolerates a failing run step that allows fails', async (context) => {
     try {
         const builder = new Builder({
             cwd: dir,
+            projectRoot: dir,
             pipeline: pipeline({ run: 'node -e "process.exit(1)"', allowFails: true }, { run: 'node -e "require(\'fs\').writeFileSync(\'after.txt\', \'after\')"' })
         });
         await builder.run();
@@ -115,7 +117,7 @@ suite.add('tolerates a failing run step that allows fails', async (context) => {
 suite.add('fails the build when the deadline of a run step is reached', async (context) => {
     const dir = await createTemp();
     try {
-        const builder = new Builder({ cwd: dir, pipeline: pipeline({ run: blockingScript(), maxTimeMs: 500 }) });
+        const builder = new Builder({ cwd: dir, projectRoot: dir, pipeline: pipeline({ run: blockingScript(), maxTimeMs: 500 }) });
         const started = Date.now();
         try {
             await builder.run();
@@ -131,7 +133,7 @@ suite.add('fails the build when the deadline of a run step is reached', async (c
 suite.add('does not tolerate a deadline that a step allows fails for', async (context) => {
     const dir = await createTemp();
     try {
-        const builder = new Builder({ cwd: dir, pipeline: pipeline({ run: blockingScript(), maxTimeMs: 500, allowFails: true }) });
+        const builder = new Builder({ cwd: dir, projectRoot: dir, pipeline: pipeline({ run: blockingScript(), maxTimeMs: 500, allowFails: true }) });
         try {
             await builder.run();
             context.fail('expected the build to reject once the deadline is reached');
@@ -146,9 +148,99 @@ suite.add('extracts files to a destination relative to the build', async (contex
     const dir = await createTemp();
     try {
         await File.write(Path.join(dir, 'index.js'), 'export const value = 1;');
-        const builder = new Builder({ cwd: dir, pipeline: pipeline({ extract: { '**/*.js': { to: 'lib' } } }) });
+        const builder = new Builder({ cwd: dir, projectRoot: dir, pipeline: pipeline({ extract: { '**/*.js': { to: 'lib' } } }) });
         await builder.run();
         context.expect(await File.read(Path.join(dir, 'lib', 'index.js'), 'utf-8')).equals('export const value = 1;');
+        context.done();
+    } finally { await removeTemp(dir); }
+});
+
+suite.add('extracts to a destination relative to the project, not to the folder the build works in', async (context) => {
+    const dir = await createTemp();
+    try {
+        const checkout = Path.join(dir, '.depflow', 'omega');
+        const project = Path.join(dir, 'project');
+        await File.ensureDir(Path.join(checkout, 'build'));
+        await File.ensureDir(project);
+        await File.write(Path.join(checkout, 'build', 'index.js'), 'export const value = 1;');
+
+        const builder = new Builder({
+            cwd: checkout,
+            projectRoot: project,
+            pipeline: pipeline({ extract: { 'build/**/*.js': { to: 'public/lib/omega', map: '^build/' } } })
+        });
+        await builder.run();
+
+        context.expect(await File.read(Path.join(project, 'public', 'lib', 'omega', 'index.js'), 'utf-8')).equals('export const value = 1;');
+        context.expect(await File.exists(Path.join(checkout, 'public'))).notOk();
+        context.done();
+    } finally { await removeTemp(dir); }
+});
+
+suite.add('refuses a relative destination that walks out of the project', async (context) => {
+    const dir = await createTemp();
+    try {
+        const checkout = Path.join(dir, '.depflow', 'omega');
+        const project = Path.join(dir, 'project');
+        await File.ensureDir(Path.join(checkout, 'build'));
+        await File.ensureDir(project);
+        await File.write(Path.join(checkout, 'build', 'index.js'), 'export const value = 1;');
+
+        const builder = new Builder({
+            cwd: checkout,
+            projectRoot: project,
+            pipeline: pipeline({ extract: { 'build/**/*.js': { to: '../escaped' } } })
+        });
+        try {
+            await builder.run();
+            context.fail('expected the build to reject a destination outside the project');
+        } catch (error) {
+            context.expect((error as Error).message).includes('outside of the project root');
+        }
+        context.expect(await File.exists(Path.join(dir, 'escaped'))).notOk();
+        context.done();
+    } finally { await removeTemp(dir); }
+});
+
+suite.add('extracts to the project root itself when the destination says so', async (context) => {
+    const dir = await createTemp();
+    try {
+        const checkout = Path.join(dir, '.depflow', 'omega');
+        const project = Path.join(dir, 'project');
+        await File.ensureDir(Path.join(checkout, 'build'));
+        await File.ensureDir(project);
+        await File.write(Path.join(checkout, 'build', 'index.js'), 'export const value = 1;');
+
+        const builder = new Builder({
+            cwd: checkout,
+            projectRoot: project,
+            pipeline: pipeline({ extract: { 'build/**/*.js': { to: '.', map: '^build/' } } })
+        });
+        await builder.run();
+
+        context.expect(await File.read(Path.join(project, 'index.js'), 'utf-8')).equals('export const value = 1;');
+        context.done();
+    } finally { await removeTemp(dir); }
+});
+
+suite.add('extracts to an absolute destination outside the project as it stands', async (context) => {
+    const dir = await createTemp();
+    try {
+        const checkout = Path.join(dir, '.depflow', 'omega');
+        const project = Path.join(dir, 'project');
+        const elsewhere = Path.join(dir, 'elsewhere');
+        await File.ensureDir(Path.join(checkout, 'build'));
+        await File.ensureDir(project);
+        await File.write(Path.join(checkout, 'build', 'index.js'), 'export const value = 1;');
+
+        const builder = new Builder({
+            cwd: checkout,
+            projectRoot: project,
+            pipeline: pipeline({ extract: { 'build/**/*.js': { to: elsewhere, map: '^build/' } } })
+        });
+        await builder.run();
+
+        context.expect(await File.read(Path.join(elsewhere, 'index.js'), 'utf-8')).equals('export const value = 1;');
         context.done();
     } finally { await removeTemp(dir); }
 });
@@ -157,7 +249,7 @@ suite.add('transforms the files a glob matches', async (context) => {
     const dir = await createTemp();
     try {
         await File.write(Path.join(dir, 'index.js'), 'const value = "keep";');
-        const builder = new Builder({ cwd: dir, pipeline: pipeline({ transform: { glob: '**/*.js', search: '"keep"', replace: '"replaced"' } }) });
+        const builder = new Builder({ cwd: dir, projectRoot: dir, pipeline: pipeline({ transform: { glob: '**/*.js', search: '"keep"', replace: '"replaced"' } }) });
         await builder.run();
         context.expect(await File.read(Path.join(dir, 'index.js'), 'utf-8')).equals('const value = "replaced";');
         context.done();

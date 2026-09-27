@@ -13,11 +13,13 @@ import schema from "../schema/schema.js";
 export class Builder {
     protected readonly pipeline: schema.Builder = [];
     protected readonly cwd: string = process.cwd();
+    protected readonly projectRoot: string = process.cwd();
     protected readonly logger: Logger | null;
 
     public constructor(info: Builder.Info) {
         this.pipeline = info.pipeline;
         this.cwd = info.cwd;
+        this.projectRoot = info.projectRoot;
         this.logger = info.logger || null;
     }
     public async run(): Promise<void> {
@@ -51,6 +53,26 @@ export class Builder {
         });
     }
     /**
+     * Resolves the destination folder of an extraction entry, which is relative to the project root, and
+     * guarantees it stays inside it.
+     * @param to - The destination folder declared by the entry.
+     * @returns The normalized path of the destination folder.
+     * @throws { Error } When a relative destination escapes the project root.
+     *
+     * @remarks An absolute destination is taken as it stands: writing outside the project is a decision
+     * the configuration takes on purpose, and spelling it out as an absolute path is what makes it one.
+     * A relative destination cannot, because a `..` that walks out of the project is a mistake and not a
+     * decision. The project root is a destination like any other, so it is not treated as an escape.
+     */
+    protected resolveDestination(to: string): string {
+        if (Path.isAbsolute(to)) return to;
+
+        const root = Path.normalize(this.projectRoot);
+        const destination = Path.normalize(Path.join(root, to));
+        if (destination !== root && !Path.isInside(root, destination)) throw new Error(`Extraction destination resolves outside of the project root: ${destination}`);
+        return destination;
+    }
+    /**
      * Runs the extraction process based on the provided entry configuration, which can be either a string or an array of extraction entries.
      * It handles the copying of files from the specified source to the target location, applying any necessary path transformations based on the provided replacer configuration.
      * This method is essential for managing the file extraction phase of the build process, allowing for flexible and customizable file handling as defined in the builder configuration.
@@ -64,12 +86,12 @@ export class Builder {
             : entry;
 
         for (const [from, entry] of Object.entries(extractor)) {
-            const { to, map, transform } = typeof entry === 'string' ? { to: entry, map: undefined, transform: undefined } : entry;
+            const { to, map, transform } = typeof entry === 'string' ? { to: entry } : entry;
 
             const mapper = Builder.replacer(map);
             const replacer = Builder.replacer(transform);
 
-            const destination = Path.isAbsolute(to) ? to : Path.join(this.cwd, to);
+            const destination = this.resolveDestination(to);
             this.logger?.log(`&C7Extracting &C3${from}&C7 to &C3${to}&C7...`);
             
             await File.smartProcess(from, destination, {
@@ -122,7 +144,16 @@ export namespace Builder {
     export type Transformer = (str: string) => string;
     export interface Info {
         pipeline: schema.Builder;
+        /**
+         * The folder the pipeline reads and works in: the checkout of a dependency, or the project itself
+         * for a `dep run` action. It is the base of every glob, of every `run` step and of every `map`.
+         */
         cwd: string;
+        /**
+         * The root of the project the pipeline deposits into. It is the base of every relative `to` of an
+         * extraction step, which is where the artifacts of a dependency are meant to land.
+         */
+        projectRoot: string;
         logger?: Logger | null;
     }
 }
