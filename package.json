@@ -1,7 +1,7 @@
 {
   "name": "depflow",
   "description": "is a simple dependency manager based on github repositories",
-  "version": "3.0.0-dev.11",
+  "version": "3.0.0-dev.12",
   "main": "dist/cli/bin.js",
   "type": "module",
   "bin": {

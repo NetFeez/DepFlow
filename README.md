@@ -389,13 +389,17 @@ it. `dep --flow x install` is read as the command `--flow`, so flags belong afte
 
 | Command | Usage | Description |
 |---|---|---|
-| `add` | `dep add <repo> [name]` | Add a git dependency to the configuration, creating the file from the defaults if it does not exist. A GitHub repository may be given as `user/repo`, as an HTTP(S) URL or as an ssh address, with or without the `.git` suffix; it is canonicalized to the URL git clones from. The name is derived from the repository when omitted, which only a GitHub repository allows. A name already taken is refused. |
+| `add` | `dep add <repo> [name] [--tag <ref>]` or `dep add --npm <name>[@<version>]` | Add a dependency to the configuration, creating the file from the defaults if it does not exist. A git repository may be given as `user/repo`, as an HTTP(S) URL or as an ssh address, with or without the `.git` suffix; it is canonicalized to the URL git clones from, and its name is derived from it when omitted, which only a GitHub repository allows. `--tag` sets the tag, branch or commit it is checked out at (default `main`). With `--npm` the argument is an npm package `<name>[@<version>]`, defaulting to `latest`, registered under `npmDependencies`. A name already taken is refused. |
 | `remove` | `dep remove <name\|repo_url>` | Remove a dependency by name (git or npm) or by git repository URL, and uninstall its local files. An identifier no dependency declares is an error. |
 | `install` | `dep install [name...]` | Fetch, build and extract every dependency, or only the named ones. A checkout already in place is updated to its `tag` instead of cloned again. Runs `sync` afterwards. |
 | `run` | `dep run <action>` | Run a named action from `actions`, in the project root. |
 | `list` | `dep list` | List the declared dependencies, marking each one `installed` or `missing`. |
 | `rewrite-paths` | `dep rewrite-paths [--watch] [--cdn]` | Rewrite import specifiers in the built files of `outDir` according to the resolver. A file that cannot be rewritten fails the command. |
 | `sync` | `dep sync [--cdn]` | Write the resolver aliases into the configured `tsconfig` and `importmap`. |
+| `resolver` | `dep resolver add <alias> <local> [--type <t>] [--cdn-url <url>] [--force] \| remove <alias> \| list \| clear` | Edit the resolver aliases. Without `--dep` the project resolver is edited; with it, the named dependency's own resolver. `add` refuses an alias already taken unless `--force` is given. |
+| `builder` | `dep builder add <run\|extract\|transform> ... \| remove <index> \| move <from> <to> \| list \| clear` | Edit the build pipeline of the dependency named by `--dep` or of the action named by `--action`. `add run` takes one or more commands (`--max-time`, `--allow-fails`); `add extract` takes a glob (`--to`, `--map`); `add transform` takes a glob (`--search`, `--replace`, `--flags`). `--index` chooses where the step is inserted. |
+| `action` | `dep action create <name> \| remove <name> \| list` | Create, remove or list the named actions of the configuration. A new action starts empty and is filled through `builder --action`. |
+| `config` | `dep config get [key] \| set <key> <value> \| unset <key>` | Read and edit the top-level settings `outDir`, `tsconfig` and `importmap`. `set` accepts `null` for the nullable ones; `outDir` cannot be unset. |
 | `json-to-yaml` | `dep json-to-yaml [output.yaml]` | Convert the config to YAML. The output name is derived from the input name when omitted. |
 | `yaml-to-json` | `dep yaml-to-json [output.json]` | Convert the config to JSON. The output name is derived from the input name when omitted. |
 
@@ -414,6 +418,8 @@ printed rather than a prompt being opened.
 
 ### Flags
 
+These are the global flags: every command accepts all of them.
+
 | Flag | Aliases | Default | Description |
 |---|---|---|---|
 | `--flow <file>` | `-p`, `-f` | `depflow.yml` | Configuration file the command operates on. |
@@ -422,6 +428,29 @@ printed rather than a prompt being opened.
 | `--verbose` | `-v` | `false` | Stream the output of every command as it runs, attributed to the command that wrote it. |
 | `--silent` | — | `false` | Say only what failed, one line per failed command. |
 | `--decorate` | — | `true` | Draw boxes, indentation, timestamps, levels and names. Use `--decorate=false` to leave the content alone. |
+
+Beside the global ones, an editing command declares the flags it owns. A flag is only accepted by the
+command that declares it: `dep install --to x` is answered with `Unknown flag: --to`, and the help
+lists the owned flags under their command.
+
+| Command | Flag | Aliases | Default | Description |
+|---|---|---|---|---|
+| `add` | `--npm` | — | `false` | Add an npm dependency instead of a git one. |
+| `add` | `--tag <ref>` | — | `main` | Tag, branch or commit the added git dependency is checked out at. |
+| `resolver` | `--dep <name>` | — | — | Dependency whose resolver is edited. Omitted, the project resolver is edited. |
+| `resolver` | `--type <type>` | — | — | Type identifier of a resolver target, set alongside its local path. |
+| `resolver` | `--cdnUrl <url>` | `--cdn-url` | — | CDN URL of a resolver target, set alongside its local path. |
+| `resolver` | `--force` | — | `false` | Overwrite an existing resolver alias instead of failing. |
+| `builder` | `--dep <name>` | — | — | Dependency whose build pipeline is edited. |
+| `builder` | `--action <name>` | — | — | Action whose build pipeline is edited. |
+| `builder` | `--to <dir>` | — | — | Destination folder of an extract build step. |
+| `builder` | `--map <pattern>` | — | — | Pattern applied to the destination path of an extract build step. |
+| `builder` | `--search <regex>` | — | — | Regular expression a transform build step searches for. |
+| `builder` | `--replace <text>` | — | — | Replacement string of a transform build step. |
+| `builder` | `--flags <flags>` | — | `g` | Flags of the regular expression of a transform build step. |
+| `builder` | `--maxTime <ms>` | `--max-time` | `60000` | Maximum execution time of a run build step; `-1` disables the limit. |
+| `builder` | `--allowFails` | `--allow-fails` | `false` | Whether the commands of a run build step may fail. |
+| `builder` | `--index <n>` | — | end | Position at which a build step is inserted. |
 
 Flag parsing rules:
 

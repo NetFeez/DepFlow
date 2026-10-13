@@ -1,7 +1,7 @@
 /**
  * @author NetFeez <netfeez.dev@gmail.com>.
  * @description The console interface the CLI is built on: it reads a command, runs it and answers it,
- *              and it draws the help the global flags and the arguments of every command are told in.
+ *              and it draws the help the global flags, and the arguments and flags of every command are told in.
  * @license Apache-2.0
  */
 
@@ -99,6 +99,21 @@ export class CLI {
     public getCommand(command: string): CLI.Command | undefined { return this.commandMap[command]; }
 
     /**
+     * The declaration of the flags a command line accepts: the global ones every command carries, plus the
+     * ones the named command owns.
+     * @param command - The name of the command, when the line named one.
+     * @returns The declaration the flags of that command line are parsed against.
+     *
+     * @remarks A named command that the map does not carry gets the global flags alone: the line is still
+     * parsed, so a token that is a flag of no command is reported as an unknown flag rather than as an
+     * unknown command.
+     */
+    public declarationOf(command?: string): Flags.Declaration {
+        const own = command === undefined ? undefined : this.commandMap[command]?.flags;
+        return own ? { ...this.globals, ...own } : this.globals;
+    }
+
+    /**
      * Puts a command in the map.
      * @param command - The name of the command.
      * @param exec - What the command does when it is written.
@@ -130,7 +145,7 @@ export class CLI {
 
     /**
      * Writes the banner, the global flags and every command of the map with its usage, its description
-     * and the arguments it accepts.
+     * and the arguments and flags it accepts.
      *
      * @remarks The help belongs to the terminal and not to a run, so it is written as it is composed
      * and it is not announced through the engine: no timestamp, level or name is put in front of it,
@@ -153,6 +168,9 @@ export class CLI {
             if (command.description) lines.push(...CLI.wrap(command.description, width - 5).map(line => `   ${line}`));
             for (const [ name, argument ] of Object.entries(command.args ?? {})) {
                 lines.push(...CLI.describe(CLI.argumentKey(name, argument), argument.description, width, 5));
+            }
+            for (const [ name, flag ] of Object.entries(command.flags ?? {})) {
+                lines.push(...CLI.describe(CLI.flagKey(name, flag), flag.description ?? '', width, 5));
             }
             lines.push('');
         }
@@ -258,6 +276,9 @@ export namespace CLI {
         description?: string;
         usage?: string;
         args?: Arguments;
+
+        /** The flags the command owns, beside the global ones every command carries. **/
+        flags?: Flags.Declaration;
     }
 
     /** A command of the console interface, with what it does and what `help` tells about it. **/

@@ -6,8 +6,8 @@
  */
 import Logger, { type Engine } from "@netfeez/vterm";
 
-import DepflowCLI, { options } from "./DepflowCLI.js";
-import type Flags from "./Flags.js";
+import DepflowCLI from "./DepflowCLI.js";
+import Flags from "./Flags.js";
 
 const skip = 2;
 const [commandName, ...argsList] = process.argv.slice(skip);
@@ -39,28 +39,31 @@ function fail(out: Engine | Logger, error: any): void {
     process.exitCode = 1;
 }
 
-let parsed: Flags.Result<DepflowCLI.Options> | undefined;
-try { parsed = options.parse(argsList); }
-catch (error: any) { fail(new Logger(), error); }
+// The command is resolved before the flags are parsed because the flags are declared per command: the
+// global ones every command carries and the ones the invoked command owns. A command the map does not
+// carry leaves nothing to parse and is answered by the console interface, help included, in every mode.
+const cli = new DepflowCLI();
+const command = commandName ? cli.getCommand(commandName) : undefined;
 
-// A failed parse leaves nothing to dispatch: the invocation was never understood, so there is no command
-// to run and no CLI to run it with. The process still ends here, with the status `fail` marked.
-if (parsed !== undefined) {
-    const { args, flags } = parsed;
-    const cli = new DepflowCLI(flags.flow);
+if (command) {
+    let parsed: Flags.Result<DepflowCLI.Options> | undefined;
+    try { parsed = new Flags(cli.declarationOf(commandName)).parse(argsList) as Flags.Result<DepflowCLI.Options>; }
+    catch (error: any) { fail(cli.out, error); }
 
-    try {
-        if (commandName !== null) {
-            const command = cli.getCommand(commandName);
-            if (command) {
-                const exec = command.exec as DepflowCLI.Exec;
-                await exec.call(cli, commandName, args, flags);
-            } else {
-                cli.out.error(`Unknown command: ${commandName}`);
-                cli.getCommand('help')?.exec.call(cli, 'help', []);
-            }
-        } else cli.start();
-    } catch (error: any) {
-        fail(cli.out, error);
+    // A failed parse leaves nothing to dispatch: the invocation was never understood, so there is no
+    // argument to hand the command. The process still ends here, with the status `fail` marked.
+    if (parsed !== undefined) {
+        const { args, flags } = parsed;
+        cli.configPath = flags.flow;
+
+        try {
+            const exec = command.exec as DepflowCLI.Exec;
+            await exec.call(cli, commandName as string, args, flags);
+        } catch (error: any) {
+            fail(cli.out, error);
+        }
     }
+} else {
+    cli.out.error(`Unknown command: ${commandName}`);
+    cli.getCommand('help')?.exec.call(cli, 'help', []);
 }

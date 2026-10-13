@@ -19,6 +19,7 @@ import outputPolicySuite from './OutputPolicy.test.js';
 import taskSuite from './Task.test.js';
 import cliSuite from './DepFlowCLI.test.js';
 import cliModesSuite from './CliModes.test.js';
+import editingSuite from './Editing.test.js';
 import endToEndSuite from './EndToEnd.test.js';
 
 const suites: TestSuite[] = [
@@ -33,6 +34,7 @@ const suites: TestSuite[] = [
     taskSuite,
     cliSuite,
     cliModesSuite,
+    editingSuite,
     endToEndSuite
 ];
 

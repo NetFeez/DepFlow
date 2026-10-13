@@ -7,8 +7,9 @@
 import TestSuite from '@TestSuite/TestSuite.js';
 import type TestContext from '@TestSuite/TestContext.js';
 
-import { options as modes } from '../src/cli/DepflowCLI.js';
+import DepflowCLI, { options as modes } from '../src/cli/DepflowCLI.js';
 import Flags from '../src/cli/Flags.js';
+import { createTemp, removeTemp, runCli, strip } from './utils.js';
 
 const suite = new TestSuite('cli flags');
 
@@ -156,8 +157,9 @@ suite.add('rejects a declaration accepting the same name twice', (context) => {
 //
 
 suite.add('the CLI declares the three modes and the defaults the contract fixes', (context) => {
-    // The three are declared, and nothing else came with them: the declaration of the CLI is the three
-    // names it had plus these three, in this order.
+    // The three are declared among the global flags, the ones every command carries. The flags an editing
+    // command owns are declared with that command and not here, so a command that does not know one is
+    // answered with `Unknown flag` rather than accepting it in silence.
     context.expect(Object.keys(modes.declaration).join(' ')).equals('flow watch cdn verbose silent decorate');
     context.expect(modes.declaration.verbose.type).equals('boolean');
     context.expect(modes.declaration.silent.type).equals('boolean');
@@ -182,8 +184,8 @@ suite.add('the misspelled mode does not exist and the short alias belongs to ver
     modesFail(context, [ '--vervose' ], 'Unknown flag: --vervose');
     modesFail(context, [ 'run', 'check', '--vervose' ], 'Unknown flag: --vervose');
 
-    // Every alias the CLI answers to, and the flag each of them reaches: the only one this phase adds is
-    // `v`, and it reaches `verbose` and nothing else.
+    // Every alias the CLI answers to, and the flag each of them reaches: `v` reaches `verbose` alone. The
+    // aliases of the editing flags belong to the command that declares them and are asserted with it.
     const declaration: Flags.Declaration = modes.declaration;
     const aliases = Object.entries(declaration)
         .flatMap(([ name, flag ]) => (flag.aliases ?? []).map(alias => `${alias}->${name}`))
@@ -198,6 +200,58 @@ suite.add('the misspelled mode does not exist and the short alias belongs to ver
     context.expect(flags.watch).equals(false);
     context.expect(flags.cdn).equals(false);
     context.done();
+});
+
+//
+// ====== The flags each command owns beside the global ones ======
+//
+
+suite.add('a command declares its own flags, merged with the global ones', (context) => {
+    const cli = new DepflowCLI();
+    const globals = 'flow watch cdn verbose silent decorate';
+
+    const resolver = cli.declarationOf('resolver');
+    context.expect(Object.keys(resolver).join(' ')).equals(`${globals} dep type cdnUrl force`);
+    context.expect(resolver.cdnUrl.aliases?.join(' ')).equals('cdn-url');
+    context.expect('to' in resolver).equals(false);
+
+    const builder = cli.declarationOf('builder');
+    context.expect(Object.keys(builder).join(' ')).equals(`${globals} dep action to map search replace flags maxTime allowFails index`);
+    context.expect(builder.maxTime.aliases?.join(' ')).equals('max-time');
+    context.expect(builder.allowFails.aliases?.join(' ')).equals('allow-fails');
+
+    const added = cli.declarationOf('add');
+    context.expect(Object.keys(added).join(' ')).equals(`${globals} npm tag`);
+
+    // A command that owns no flag beyond the global ones carries the globals alone.
+    context.expect(Object.keys(cli.declarationOf('install')).join(' ')).equals(globals);
+    context.done();
+});
+
+suite.add('an owned flag is rejected by a command that does not declare it', (context) => {
+    const cli = new DepflowCLI();
+    try {
+        new Flags(cli.declarationOf('install')).parse([ 'install', '--to', 'x' ]);
+        context.fail('expected install to reject the flag of the builder');
+    } catch (error) { context.expect((error as Error).message).equals('Unknown flag: --to'); }
+
+    const parsed = new Flags(cli.declarationOf('resolver')).parse([ 'add', '@x', 'lib', '--type', 'module', '--cdn-url', 'https://c/x.js' ]);
+    context.expect(parsed.flags.type).equals('module');
+    context.expect(parsed.flags.cdnUrl).equals('https://c/x.js');
+    context.expect(parsed.args.join(' ')).equals('add @x lib');
+    context.done();
+});
+
+suite.add('the help lists the flags of every command beside the global ones', async (context) => {
+    const dir = await createTemp('depflow flags');
+    try {
+        const { output } = await runCli([ 'help' ], dir);
+        const said = strip(output);
+        context.expect(said.includes('--cdn-url')).equals(true);
+        context.expect(said.includes('--max-time')).equals(true);
+        context.expect(said.includes('Global flags')).equals(true);
+        context.done();
+    } finally { await removeTemp(dir); }
 });
 
 suite.add('a name the build does not declare is an error, and a mode gets no tolerated form', (context) => {
