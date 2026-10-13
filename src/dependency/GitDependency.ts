@@ -11,6 +11,7 @@ import Git from "./Git.js";
 import Group from "../task/Group.js";
 import Dependency from './Dependency.js';
 import Builder from '../builder/Builder.js';
+import type OutputPolicy from '../task/OutputPolicy.js';
 import schema from '../schema/schema.js';
 
 export class GitDependency extends Dependency implements GitDependency.Data {
@@ -21,12 +22,13 @@ export class GitDependency extends Dependency implements GitDependency.Data {
         flowFolder: string,
         projectRoot: string,
         dependency: GitDependency.Data,
-        logger: Logger | null = null
+        logger: Logger | null = null,
+        policy: OutputPolicy | null = null
     ) { super(flowFolder, projectRoot, {
             name: dependency.name,
             builder: dependency.builder,
             resolver: dependency.resolver || {}
-        }, logger);
+        }, logger, policy);
         DepUtils.repo(dependency.repo);
         this.repo = dependency.repo;
         this.tag = dependency.tag;
@@ -35,19 +37,30 @@ export class GitDependency extends Dependency implements GitDependency.Data {
     public get folder(): string { return this.resolve(this.name); }
     /** Whether the checkout of the dependency is in place. **/
     public async isInstalled(): Promise<boolean> { return File.exists(this.folder); }
+    /**
+     * Installs the dependency, bringing the repository in and building it.
+     *
+     * @remarks The group of the acquisition is opened only when the run decorates its output, and it is
+     * closed in a `finally` so an acquisition that throws leaves the output as closed as one that
+     * succeeded: a box left open is a box every line after it is drawn inside.
+     */
     public async install(): Promise<void> {
-        this.logger?.group(Group.create('#00B4FF'));
-        if (await this.isInstalled()) {
-            this.logger?.log(`&C3Repository already exists, pulling latest changes...`);
-            await Git.pull(this.folder, { tag: this.tag, logger: this.logger ?? undefined });
-            this.logger?.log(`&C2Pull completed successfully.`);
-        } else {
-            this.logger?.log(`&C5Cloning repository from &C6${this.repo}&C5...`);
-            await Git.clone(this.repo, this.folder, { tag: this.tag, logger: this.logger ?? undefined });
-            this.logger?.log(`&C2Clone completed successfully.`);
+        const boxed = this.policy === null || this.policy.decoration === 'on';
+        if (boxed) this.logger?.group(Group.create('#00B4FF'));
+        try {
+            if (await this.isInstalled()) {
+                this.logger?.log(`&C3Repository already exists, pulling latest changes...`);
+                await Git.pull(this.folder, { tag: this.tag, logger: this.logger ?? undefined, policy: this.policy });
+                this.logger?.log(`&C2Pull completed successfully.`);
+            } else {
+                this.logger?.log(`&C5Cloning repository from &C6${this.repo}&C5...`);
+                await Git.clone(this.repo, this.folder, { tag: this.tag, logger: this.logger ?? undefined, policy: this.policy });
+                this.logger?.log(`&C2Clone completed successfully.`);
+            }
+            await this.build();
+        } finally {
+            if (boxed) this.logger?.end();
         }
-        await this.build();
-        this.logger?.groupEnd();
     }
     /** Removes the local clone from the flow folder, if present. **/
     public async uninstall(): Promise<void> {
@@ -61,7 +74,8 @@ export class GitDependency extends Dependency implements GitDependency.Data {
             pipeline: this.builder,
             cwd: this.folder,
             projectRoot: this.projectRoot,
-            logger: this.logger
+            logger: this.logger,
+            policy: this.policy
         });
         await builder.run();
     }

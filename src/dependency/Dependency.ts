@@ -8,6 +8,7 @@ import type Logger from "@netfeez/vterm";
 
 import schema from "../schema/schema.js";
 import type AliasCompiler from "../resolve/AliasCompiler.js";
+import type OutputPolicy from "../task/OutputPolicy.js";
 
 export abstract class Dependency {
     /**
@@ -21,6 +22,7 @@ export abstract class Dependency {
     public static readonly ACQUISITION_TIME_MS: number = 300000;
 
     protected readonly logger: Logger | null;
+    protected readonly policy: OutputPolicy | null;
 
     public readonly name: string;
     public readonly builder: schema.Builder;
@@ -32,22 +34,31 @@ export abstract class Dependency {
      * @param projectRoot - The root of the project the artifacts of the dependency are meant to land in.
      * @param info - The identity, the build pipeline and the resolver entries of the dependency.
      * @param logger - Where the acquisition and the build of the dependency report to.
+     * @param policy - How the output of the commands the dependency runs is presented. Without it the
+     * dependency falls back to its logger, which streams the live output and says nothing else about it.
      *
      * @remarks The two roots are not the same and are not interchangeable: the flow folder owns the working
      * copy of a dependency, the project root owns what the project consumes. A pipeline reads from the first
      * and deposits into the second, which is why both travel together instead of one being derived from the
      * other.
+     *
+     * @remarks The logger and the policy are not two ways of saying the same thing. The logger carries what
+     * the dependency decides to say about itself, and it says it whatever the user asked to be shown; the
+     * policy carries what the commands printed, and how much of it is shown depends on that. A dependency
+     * built through the CLI gets both, and a dependency built from a test gets neither.
      */
     public constructor(
         public readonly flowFolder: string,
         public readonly projectRoot: string,
         info: Dependency.Info,
-        logger?: Logger | null
+        logger?: Logger | null,
+        policy?: OutputPolicy | null
     ) {
         this.name = info.name;
         this.builder = info.builder || [];
         this.resolver = info.resolver || {};
         this.logger = logger || null;
+        this.policy = policy || null;
     }
     /**
      * Resolves a folder of the dependency, relative to the flow folder, and guarantees it stays inside it.

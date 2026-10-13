@@ -67,13 +67,17 @@ suite.add('object transform without a replacement removes matches', (context) =>
     context.done();
 });
 
-suite.add('runs every command of a run step in order', async (context) => {
+suite.add('runs every command of a run step in order, and returns the report of the build', async (context) => {
     const dir = await createTemp();
     try {
         const builder = new Builder({ cwd: dir, projectRoot: dir, pipeline: pipeline({ run: [ 'node -e "require(\'fs\').writeFileSync(\'one.txt\', \'1\')"', 'node -e "require(\'fs\').writeFileSync(\'two.txt\', \'2\')"' ] }) });
-        await builder.run();
+        const report = await builder.run();
         context.expect(await File.exists(Path.join(dir, 'one.txt'))).ok();
         context.expect(await File.exists(Path.join(dir, 'two.txt'))).ok();
+        context.expect(report.ok).equals(true);
+        context.expect(report.commands).equals(2);
+        context.expect(report.failed).equals(0);
+        context.expect(report.steps[0].commands.map(command => command.ordinal).join(' ')).equals('1 2');
         context.done();
     } finally { await removeTemp(dir); }
 });
@@ -93,14 +97,21 @@ suite.add('stops the pipeline after a run step that does not tolerate its failur
             await builder.run();
             context.fail('expected the build to reject a failing run step');
         } catch (error) {
-            context.expect((error as Error).message).includes('status 1');
+            context.expect(error).instanceOf(Builder.Failure);
+            const failure = error as Builder.Failure;
+            context.expect(failure.reason).equals('command');
+            context.expect(failure.report.ok).equals(false);
+            context.expect(failure.report.steps[0].commands[0].code).equals(1);
+            context.expect(failure.report.steps[0].commands[0].reason).equals(null);
+            context.expect(failure.report.steps[1].ran).equals(false);
+            context.expect(failure.report.steps[1].commands.length).equals(0);
         }
         context.expect(await File.exists(Path.join(dir, 'after.txt'))).notOk();
         context.done();
     } finally { await removeTemp(dir); }
 });
 
-suite.add('tolerates a failing run step that allows fails', async (context) => {
+suite.add('and 29.5.37 tolerates a failing run step that allows fails', async (context) => {
     const dir = await createTemp();
     try {
         const builder = new Builder({
@@ -108,8 +119,13 @@ suite.add('tolerates a failing run step that allows fails', async (context) => {
             projectRoot: dir,
             pipeline: pipeline({ run: 'node -e "process.exit(1)"', allowFails: true }, { run: 'node -e "require(\'fs\').writeFileSync(\'after.txt\', \'after\')"' })
         });
-        await builder.run();
+        const report = await builder.run();
         context.expect(await File.exists(Path.join(dir, 'after.txt'))).ok();
+        context.expect(report.ok).equals(true);
+        context.expect(report.failed).equals(1);
+        context.expect(report.tolerated).equals(1);
+        context.expect(report.steps[0].tolerated).equals(true);
+        context.expect(report.steps[0].commands[0].success).equals(false);
         context.done();
     } finally { await removeTemp(dir); }
 });
@@ -123,7 +139,11 @@ suite.add('fails the build when the deadline of a run step is reached', async (c
             await builder.run();
             context.fail('expected the build to reject once the deadline is reached');
         } catch (error) {
-            context.expect((error as Error).message).includes('timed out');
+            context.expect(error).instanceOf(Builder.Failure);
+            const failure = error as Builder.Failure;
+            context.expect(failure.reason).equals('timeout');
+            context.expect(failure.report.steps[0].reason).equals('timeout');
+            context.expect(failure.report.steps[0].commands[0].reason).equals('timeout');
             context.expect(Date.now() - started < 30000).equals(true);
         }
         context.done();
@@ -138,8 +158,41 @@ suite.add('does not tolerate a deadline that a step allows fails for', async (co
             await builder.run();
             context.fail('expected the build to reject once the deadline is reached');
         } catch (error) {
-            context.expect((error as Error).message).includes('timed out');
+            context.expect(error).instanceOf(Builder.Failure);
+            context.expect((error as Builder.Failure).reason).equals('timeout');
         }
+        context.done();
+    } finally { await removeTemp(dir); }
+});
+
+suite.add('runs every instruction of a run step even after one of them fails', async (context) => {
+    const dir = await createTemp();
+    try {
+        const builder = new Builder({
+            cwd: dir,
+            projectRoot: dir,
+            pipeline: pipeline({ run: [ 'node -e "process.exit(1)"', 'node -e "require(\'fs\').writeFileSync(\'after.txt\', \'after\')"' ] })
+        });
+        try { await builder.run(); context.fail('expected the build to reject a failing command'); }
+        catch (error) {
+            const report = (error as Builder.Failure).report;
+            context.expect(report.steps[0].commands.length).equals(2);
+            context.expect(report.steps[0].commands[1].success).equals(true);
+        }
+        context.expect(await File.exists(Path.join(dir, 'after.txt'))).ok();
+        context.done();
+    } finally { await removeTemp(dir); }
+});
+
+suite.add('keeps the captured output out of the report of a command', async (context) => {
+    const dir = await createTemp();
+    try {
+        const builder = new Builder({ cwd: dir, projectRoot: dir, pipeline: pipeline({ run: 'node -e "console.log(\'kept in the evidence only\')"' }) });
+        const report = await builder.run();
+        const command = report.steps[0].commands[0] as unknown as Record<string, unknown>;
+        context.expect(Object.keys(command).includes('stdout')).equals(false);
+        context.expect(Object.keys(command).includes('stderr')).equals(false);
+        context.expect(Object.keys(command).join(' ')).equals('ordinal label success code signal reason time');
         context.done();
     } finally { await removeTemp(dir); }
 });

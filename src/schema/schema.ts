@@ -9,7 +9,12 @@ import _Config from './Config/Config.js';
 import _Resolver, { Target as _Target } from './Config/Resolver.js';
 import _Transform, { GlobalTransform as _GlobalTransform } from './Config/Transform.js';
 import _Extractor from './Config/Extractor.js';
-import _Builder from './Config/Builder.js';
+import _Builder, {
+    BuilderEntry as _BuilderEntry,
+    RunEntry as _RunEntry,
+    ExtractEntry as _ExtractEntry,
+    TransformEntry as _TransformEntry
+} from './Config/Builder.js';
 import _Dependency from './Config/Dependency.js';
 
 export { TSConfig } from './TSConfig.js';
@@ -18,7 +23,7 @@ export { Config } from './Config/Config.js';
 export { Resolver, Target } from './Config/Resolver.js';
 export { Transform, GlobalTransform } from './Config/Transform.js';
 export { Extractor } from './Config/Extractor.js';
-export { Builder } from './Config/Builder.js';
+export { Builder, BuilderEntry, RunEntry, ExtractEntry, TransformEntry } from './Config/Builder.js';
 export { Dependency } from './Config/Dependency.js';
 
 export namespace schema {
@@ -31,6 +36,10 @@ export namespace schema {
     export import GlobalTransform = _GlobalTransform;
     export import Extractor = _Extractor;
     export import Builder = _Builder;
+    export import BuilderEntry = _BuilderEntry;
+    export import RunEntry = _RunEntry;
+    export import ExtractEntry = _ExtractEntry;
+    export import TransformEntry = _TransformEntry;
     export import Dependency = _Dependency;
 }
 

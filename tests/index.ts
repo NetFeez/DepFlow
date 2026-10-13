@@ -15,8 +15,10 @@ import pathRewriterSuite from './PathRewriter.test.js';
 import configSuite from './Config.test.js';
 import dependencySuite from './Dependency.test.js';
 import flagsSuite from './Flags.test.js';
+import outputPolicySuite from './OutputPolicy.test.js';
 import taskSuite from './Task.test.js';
 import cliSuite from './DepFlowCLI.test.js';
+import cliModesSuite from './CliModes.test.js';
 import endToEndSuite from './EndToEnd.test.js';
 
 const suites: TestSuite[] = [
@@ -27,8 +29,10 @@ const suites: TestSuite[] = [
     configSuite,
     dependencySuite,
     flagsSuite,
+    outputPolicySuite,
     taskSuite,
     cliSuite,
+    cliModesSuite,
     endToEndSuite
 ];
 

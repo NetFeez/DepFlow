@@ -1,18 +1,18 @@
 /**
  * @author NetFeez <netfeez.dev@gmail.com>.
- * @description TRANSITIONAL — colored group template factory for @netfeez/vterm. Remove when vterm exposes a colored Grouper primitive.
+ * @description Colored group template factory for the grouper of @netfeez/vterm.
  * @license Apache-2.0
  */
 
-import type Grouper from '@netfeez/vterm/logger/Grouper';
+import type { Grouper } from '@netfeez/vterm';
 
 export namespace Group {
     /**
-     * Builds a colored group template for @netfeez/vterm.
+     * Builds a colored group template for the grouper of @netfeez/vterm.
      * @param color - A hex color (`#RRGGBB`) or a vterm color index (1-7).
      * @returns The group template with open, item, line and stop symbols.
      */
-    export function create(color: `#${string}` | number): Grouper.Group {
+    export function create(color: `#${string}` | number): Grouper.GroupTemplate {
         let code = '';
         if (typeof color === 'number') {
             code = color >= 1 && color <= 7 ? `C${color}` : 'R';

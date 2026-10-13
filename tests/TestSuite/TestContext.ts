@@ -4,28 +4,30 @@
  * @license Apache-2.0
  */
 
-import { Logger } from "@netfeez/vterm";
+import { ConsoleTransport, Engine } from '@netfeez/vterm';
 
 import Assertion from "./Assertion.js";
 import Utils from "./Utils.js";
 
 export class TestContext {
     public passed: boolean | null = null;
-    public logger: Logger;
+    public engine: Engine;
+    protected readonly transport: ConsoleTransport;
 
     /**
-     * Creates a test context bound to a logger and a display prefix.
-     * @param logger - The logger to write test messages to.
+     * Creates a test context bound to an engine and a display prefix.
+     * @param engine - The engine to write test messages to.
      * @param name - The name of the suite owning this context.
      * @param logPrefix - The prefix prepended to every logged line.
      */
     public constructor(
-        logger: Logger,
+        engine: Engine,
         public readonly name: string,
         public readonly logPrefix: string = '&C(#FFB4DC)│  '
     ) {
-        this.logger = new Logger(logger);
-        this.logger.save = false;
+        this.engine = new Engine(engine);
+        this.transport = new ConsoleTransport();
+        this.transport.attach(this.engine);
     }
 
     //
@@ -40,15 +42,15 @@ export class TestContext {
     public done(message?: string, error?: Error): void {
         if (error) {
             this.passed = false;
-            this.logger.log(`${this.logPrefix} &C1${message || 'Test failed'}`);
+            this.engine.log(`${this.logPrefix} &C1${message || 'Test failed'}`);
         } else {
             this.passed = true;
-            this.logger.log(`${this.logPrefix} &C2${message || 'Test passed'}`);
+            this.engine.log(`${this.logPrefix} &C2${message || 'Test passed'}`);
         }
     }
 
     /**
-     * Marks the test as failed by setting the passed property to false and logging an error message using the test context's logger. This method is typically called when an assertion fails or when an unexpected error occurs during the execution of a test case, allowing for consistent handling of test failures and providing informative logging for debugging purposes.
+     * Marks the test as failed by setting the passed property to false and logging an error message using the test context's engine. This method is typically called when an assertion fails or when an unexpected error occurs during the execution of a test case, allowing for consistent handling of test failures and providing informative logging for debugging purposes.
      * @param message - A string describing the reason for the test failure, which will be included in the logged error message.
      */
     public fail(message: string): never {
@@ -100,39 +102,39 @@ export class TestContext {
     //
 
     /**
-     * Logs an informational message using the test context's logger with a custom log level.
+     * Logs an informational message using the test context's engine with a custom log level.
      * @param args - The arguments to be logged, which can be of any type.
      */
     public info(...args: any[]): void {
         args = Utils.customizeArgs(args, this.logPrefix);
-        this.logger.info(`${this.logPrefix}&C7`, ...args);
+        this.engine.info(`${this.logPrefix}&C7`, ...args);
     }
 
     /**
-     * Logs an error using the test context's logger with a custom log level.
+     * Logs an error using the test context's engine with a custom log level.
      * @param args - The arguments to be logged, which can be of any type.
      */
     public error(...args: any[]): void {
         args = Utils.customizeArgs(args, this.logPrefix);
-        this.logger.error(`${this.logPrefix}&C1`, ...args);
+        this.engine.error(`${this.logPrefix}&C1`, ...args);
     }
 
     /**
-     * Logs a warning using the test context's logger with a custom log level.
+     * Logs a warning using the test context's engine with a custom log level.
      * @param args - The arguments to be logged, which can be of any type.
      */
     public warn(...args: any[]): void {
         args = Utils.customizeArgs(args, this.logPrefix);
-        this.logger.warn(`${this.logPrefix}&C3`, ...args);
+        this.engine.warn(`${this.logPrefix}&C3`, ...args);
     }
     
     /**
-     * Logs a message using the test context's logger with a custom log level.
+     * Logs a message using the test context's engine with a custom log level.
      * @param args - The arguments to be logged, which can be of any type.
      */
     public log(...args: any[]): void {
         args = Utils.customizeArgs(args, this.logPrefix);
-        this.logger.log(`${this.logPrefix}&C7`, ...args);
+        this.engine.log(`${this.logPrefix}&C7`, ...args);
     }
 }
 export namespace TestContext {}

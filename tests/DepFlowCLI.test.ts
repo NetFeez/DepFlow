@@ -8,7 +8,7 @@ import { File, Path } from '@netfeez/common-node';
 
 import DepFlowCLI, { options } from '../src/cli/DepFLowCLI.js';
 import Config from '../src/config/Config.js';
-import { createGitFixture, createTemp, lockFile, plain, removeTemp, runCli, unlockFile } from './utils.js';
+import { body, captureOutput, createGitFixture, createTemp, lockFile, plain, removeTemp, runCli, strip, unlockFile } from './utils.js';
 
 const suite = new TestSuite('cli flow');
 
@@ -39,20 +39,6 @@ async function buildable(dir: string): Promise<string> {
         resolver: { '@utils': 'src/utils' }
     }));
     return root;
-}
-
-/**
- * Whether a command rejects, so a case is proven instead of being swallowed.
- *
- * @remarks An assertion raised inside a `try` whose `catch` is empty never fails the test: the catch
- * receives the assertion itself. The rejection is therefore answered as a value, and asserted where
- * nothing can intercept it.
- * @param action - The action expected to reject.
- * @returns A promise resolving to `true` when the action rejected.
- **/
-async function rejects(action: () => Promise<unknown>): Promise<boolean> {
-    try { await action(); return false; }
-    catch { return true; }
 }
 
 suite.add('install rejects a non-matching dependency name', async (context) => {
@@ -237,14 +223,15 @@ suite.add('list tells an installed dependency from a missing one', async (contex
         await File.ensureDir(Path.join(dir, '.depflow', 'alpha'));
 
         const cli = new DepFlowCLI(file);
-        const lines: string[] = [];
-        cli.out.info = (message: string) => { lines.push(message); };
-        await cli.list('list', []);
+        const captured = await captureOutput(() => cli.list('list', []));
 
-        const alpha = lines.find(line => line.includes('alpha'));
-        const beta = lines.find(line => line.includes('beta'));
-        context.expect(alpha).includes('installed');
-        context.expect(beta).includes('missing');
+        // The decoration lives inside the width the renderer is given, so an entry wraps within it: every
+        // space the render put in, the filler between the wrapped pieces among them, is taken out of both
+        // sides of the comparison, and what is asserted is the entry itself, name, repository and state.
+        const flat = (text: string): string => text.replace(/\s+/g, '');
+        const rendered = flat(body(captured.lines).join(''));
+        context.expect(rendered).includes(flat(`alpha from ${origin} (installed)`));
+        context.expect(rendered).includes(flat(`beta from ${origin} (missing)`));
         context.done();
     } finally { await removeTemp(dir); }
 });
@@ -274,13 +261,12 @@ suite.add('reports no success when the acquisition of a dependency fails', async
         }));
 
         const cli = new DepFlowCLI(file);
-        const lines: string[] = [];
-        cli.out.info = (message: string) => { lines.push(message); };
-        cli.out.error = (message: string) => { lines.push(message); };
+        const captured = await captureOutput(() => cli.commandInstall('install', []));
 
-        context.expect(await rejects(() => cli.commandInstall('install', []))).equals(true);
-        context.expect(lines.some(line => line.includes('Installed'))).equals(false);
-        context.expect(lines.some(line => line.includes('Synchronizing'))).equals(false);
+        context.expect(captured.error !== undefined).equals(true);
+        const text = strip(captured.text);
+        context.expect(text.includes('Installed')).equals(false);
+        context.expect(text.includes('Synchronizing')).equals(false);
         context.done();
     } finally { await removeTemp(dir); }
 });

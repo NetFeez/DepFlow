@@ -18,7 +18,6 @@ export class Task extends Events<Task.EventMap> {
     protected vIsRunning: boolean = false;
     protected vIsStopped: boolean = false;
     protected vReason: Task.Reason | null = null;
-    protected vShellError: string | null = null;
 
     /** The shell the scripts are written to, created only when an instruction needs one. */
     protected shell: Command.Shell | null = null;
@@ -44,7 +43,6 @@ export class Task extends Events<Task.EventMap> {
     public get totalTime(): number { return this.vTotalTime; }
     public get successes(): number { return this.vResults.filter(r => r.success).length; }
     public get results(): Task.commandResult[] { return this.vResults; }
-    public get errors(): string[] { return this.vResults.filter(r => !r.success).map(r => r.result); }
     public get fails(): number { return this.vResults.filter(r => !r.success).length; }
 
     /**
@@ -83,8 +81,8 @@ export class Task extends Events<Task.EventMap> {
                 this.vResults.push(result);
                 this.vTotalTime += result.time;
 
-                if (result.success) this.emit('step', result.result, this.vCurrentStep, result.time);
-                else this.emit('error', result.result, this.vCurrentStep, result.time);
+                if (result.success) this.emit('step', result, this.vCurrentStep, result.time);
+                else this.emit('error', result, this.vCurrentStep, result.time);
 
                 if (result.reason && result.reason !== 'stopped') this.vReason = result.reason;
                 if (result.reason) break;
@@ -123,21 +121,20 @@ export class Task extends Events<Task.EventMap> {
      * @returns A promise resolving with the result of the instruction.
      **/
     protected async execute(instruction: Task.Instruction): Promise<Task.commandResult> {
+        const ordinal = this.vCurrentStep;
         const command = typeof instruction === 'string'
-            ? Command.inShell(await this.getShell(), instruction)
-            : Command.asProgram({ cwd: this.cwd, ...instruction });
+            ? Command.inShell(await this.getShell(), instruction, ordinal)
+            : Command.asProgram({ cwd: this.cwd, ...instruction }, ordinal);
 
         this.current = command;
         if (this.vIsStopped) command.kill('stopped');
 
         return new Promise((resolve) => {
-            command.on('log', (line) => this.emit('line', line));
-            command.on('err', (line) => this.emit('err', line));
+            command.on('log', (line, step) => this.emit('line', line, step));
+            command.on('err', (line, step) => this.emit('err', line, step));
             command.once('end', (verdict) => {
                 if (this.current === command) this.current = null;
-                const result = Task.result(command.label, verdict);
-                if (result.reason === 'shell' && this.vShellError) result.result += `\n${this.vShellError}`;
-                resolve(result);
+                resolve(Task.result(command.label, verdict, ordinal));
             });
             command.exec();
         });
@@ -149,15 +146,16 @@ export class Task extends Events<Task.EventMap> {
      *
      * @remarks The shell is silenced before it is handed over: everything it writes about itself belongs
      * to the shell and not to the first instruction, so the handshake that removes it completes first.
+     *
+     * @remarks A shell that dies takes down the instruction reading it, and the reason of the run becomes
+     * `shell`: the instruction is reported as unfinished because there is no longer anything reading it,
+     * and it is the task that owns the shell that says the shell is gone.
      */
     protected async getShell(): Promise<Command.Shell | null> {
         if (!this.shell) {
             this.shell = Command.createShell(this.cwd);
             this.shell.stdin.on('error', () => { });
-            this.shell.once('error', (error: Error) => {
-                this.vShellError = error.message;
-                this.current?.kill('shell');
-            });
+            this.shell.once('error', () => { this.current?.kill('shell'); });
             this.shell.once('exit', () => { this.current?.kill('shell'); });
             this.prepared = Command.prepare(this.shell);
         }
@@ -197,43 +195,56 @@ export class Task extends Events<Task.EventMap> {
     }
 
     /**
-     * Turns the verdict of an instruction into the result the task keeps, describing the instruction
-     * and its failure in the one message a caller gets.
+     * Turns the verdict of an instruction into the result the task keeps: the identity of the command,
+     * the verdict itself, the output it produced and the diagnostic that explains how it ended.
+     *
+     * @remarks The output and the error are kept whole, so a caller can show them, save them or search
+     * them without a policy having to be present while the command runs. Nothing is added to either
+     * buffer, and the diagnostic never carries them: it says what happened, and the buffers say why.
+     *
      * @param label - The human readable form of the instruction.
      * @param verdict - The verdict the command settled with.
+     * @param ordinal - The position of the instruction inside the task, starting at 1.
      * @returns The result of the instruction.
      **/
-    protected static result(label: string, verdict: Command.Verdict): Task.commandResult {
-        const success = verdict.code === 0 && verdict.reason === null;
+    protected static result(label: string, verdict: Command.Verdict, ordinal: number): Task.commandResult {
         return {
-            success,
-            result: Task.message(label, verdict),
-            time: verdict.time,
+            ordinal,
+            label,
+            success: verdict.code === 0 && verdict.reason === null,
             code: verdict.code,
             signal: verdict.signal,
             reason: verdict.reason,
-            stderr: verdict.error
+            time: verdict.time,
+            stdout: verdict.output,
+            stderr: verdict.error,
+            diagnostic: Task.diagnostic(label, verdict)
         };
     }
 
     /**
-     * The message that describes an instruction and how it ended.
+     * The one line that explains how an instruction ended, the same in every mode and the only text
+     * about the failure that belongs to the result.
+     *
+     * @remarks A command that failed carries its status, its signal or the reason it could not finish,
+     * and never its output: mixing both made the first line of a failure unreadable, and the output is
+     * already in the buffers, in the evidence file and, when it is wanted, right under this line.
+     *
      * @param label - The human readable form of the instruction.
      * @param verdict - The verdict the command settled with.
-     * @returns The message of the instruction, empty when it produced no output and succeeded.
+     * @returns The diagnostic of the instruction, empty when it succeeded.
      **/
-    protected static message(label: string, verdict: Command.Verdict): string {
-        if (verdict.reason === null && verdict.code === 0) return verdict.output;
+    protected static diagnostic(label: string, verdict: Command.Verdict): string {
         if (verdict.reason === 'timeout') return `Instruction timed out: ${label}`;
         if (verdict.reason === 'stopped') return `Instruction stopped: ${label}`;
         if (verdict.reason === 'shell') return `The shell exited before the instruction finished: ${label}`;
         if (verdict.reason === 'spawn') return `Instruction could not be started: ${label}`;
         if (verdict.reason === 'protocol') return `The shell did not report the status of: ${label}`;
+        if (verdict.reason !== null || verdict.code === 0) return '';
 
-        const failure = verdict.signal
+        return verdict.signal
             ? `Command failed with signal ${verdict.signal}: ${label}`
             : `Command failed with status ${verdict.code}: ${label}`;
-        return verdict.error ? `${failure}\n${verdict.error}` : failure;
     }
 
     /**
@@ -247,8 +258,7 @@ export class Task extends Events<Task.EventMap> {
             completes: this.completes,
             fails: this.fails,
             totalTime: this.totalTime,
-            results: this.results,
-            errors: this.errors
+            results: this.results
         };
     }
 }
@@ -265,22 +275,45 @@ export namespace Task {
         allowFails?: boolean;
     }
 
+    /**
+     * The events of a task: a line of stdout, a line of stderr, the result of the instruction that just
+     * ended, and the summary of the run.
+     *
+     * @remarks Every line and every result carries the ordinal of the instruction it belongs to, the one
+     * the command already knows, so a consumer can attribute both without keeping a counter of its own.
+     */
     export type EventMap = {
-        line: [line: string];
-        err: [line: string];
-        step: [result: string, step: number, time: number ];
-        error: [error: string, step: number, time: number];
+        line: [line: string, ordinal: number];
+        err: [line: string, ordinal: number];
+        step: [commandResult: commandResult, step: number, time: number];
+        error: [commandResult: commandResult, step: number, time: number];
         finish: [data: FinishData];
     }
 
+    /**
+     * Everything a task knows about one instruction: who it was, how it ended, and everything it said.
+     */
     export interface commandResult {
+        /** The position of the instruction inside its task, starting at 1. */
+        ordinal: number;
+        /** The human readable form of the instruction, whole, as it was given. */
+        label: string;
+        /** Whether the instruction ended as it was asked to. */
         success: boolean;
-        result: string;
-        time: number;
+        /** The exit status, or `null` when there was none. */
         code: number | null;
+        /** The signal that took the command down, or `null` when there was none. */
         signal: NodeJS.Signals | null;
+        /** Why there is no status at all, or `null` when the command reported one. */
         reason: Reason | null;
+        /** The time the instruction took, in milliseconds. */
+        time: number;
+        /** Everything the instruction wrote to stdout. */
+        stdout: string;
+        /** Everything the instruction wrote to stderr. */
         stderr: string;
+        /** The one line that explains a failure, empty when the instruction succeeded. */
+        diagnostic: string;
     }
 
     export interface FinishData {
@@ -289,11 +322,14 @@ export namespace Task {
         fails: number;
         totalTime: number;
         results: commandResult[];
-        errors: string[];
     }
 
     /**
      * The failure of a task, carrying the summary of the run that produced it.
+     *
+     * @remarks The message says how the task failed and nothing more. The output of every instruction is
+     * in the summary, one result per command, and printing it here duplicated it in every message a
+     * caller logged: a task that printed a build log threw the log away once per layer that reported it.
      */
     export class Failure extends Error {
         /**
@@ -307,21 +343,21 @@ export namespace Task {
         }
 
         /**
-         * The message describing why a task failed, and every failure it collected on the way.
+         * The message describing why a task failed: how many instructions failed, and why the run did not
+         * get to all of them.
          * @param outcome - The summary of the run.
          * @param reason - Why the task failed.
          * @returns The message of the failure.
          **/
         private static message(outcome: FinishData, reason: Reason | 'command'): string {
             const lines: string[] = [];
+            if (outcome.fails > 0) lines.push(`Task failed with ${outcome.fails} failed instruction(s).`);
+
             if (reason === 'timeout') lines.push('Task timed out before completing every instruction.');
             else if (reason === 'stopped') lines.push('Task was stopped before completing every instruction.');
             else if (reason === 'shell') lines.push('The shell running the task exited unexpectedly.');
             else if (reason === 'spawn') lines.push('An instruction could not be started.');
             else if (reason === 'protocol') lines.push('The shell did not report the status of an instruction.');
-            else lines.push(`Task failed with ${outcome.fails} failed instruction(s).`);
-
-            if (outcome.errors.length > 0) lines.push('Errors:', ...outcome.errors);
             return lines.join('\n');
         }
     }

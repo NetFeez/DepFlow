@@ -9,6 +9,8 @@ import { File, Path } from '@netfeez/common-node';
 import DepUtils from '../src/dependency/DepUtils.js';
 import GitDependency from '../src/dependency/GitDependency.js';
 import NpmDependency from '../src/dependency/NpmDependency.js';
+import Builder from '../src/builder/Builder.js';
+import Task from '../src/task/Task.js';
 import schema from '../src/schema/schema.js';
 import { createGitFixture, createTemp, removeTemp, run } from './utils.js';
 
@@ -258,7 +260,10 @@ suite.add('fails the install when the build of the dependency fails', async (con
             await dependency.install();
             context.fail('expected the install to reject a failing build');
         } catch (error) {
-            context.expect((error as Error).message).includes('status 1');
+            context.expect(error).instanceOf(Builder.Failure);
+            const failure = error as Builder.Failure;
+            context.expect(failure.report.steps[0].commands[0].code).equals(1);
+            context.expect(failure.report.ok).equals(false);
         }
         context.done();
     } finally { await removeTemp(dir); }
@@ -289,7 +294,11 @@ suite.add('fails the install when the repository cannot be cloned', async (conte
             await dependency.install();
             context.fail('expected the install to reject a repository that cannot be cloned');
         } catch (error) {
-            context.expect((error as Error).message).includes('status 128');
+            context.expect(error).instanceOf(Task.Failure);
+            const failure = error as Task.Failure;
+            context.expect(failure.outcome.results[0].code).equals(128);
+            context.expect(failure.outcome.results[0].diagnostic).includes('status 128');
+            context.expect(failure.message.includes('status 128')).equals(false);
         }
         context.expect(await File.exists(Path.join(flow, 'omega', 'version.txt'))).notOk();
         context.done();

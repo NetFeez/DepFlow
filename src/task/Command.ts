@@ -39,12 +39,15 @@ export class Command extends Events<Command.EventMap> {
     protected outputCursor: number = 0;
     protected errorsCursor: number = 0;
 
+    private vOrdinal: number;
+
     private constructor(mode: Command.Mode, options: Command.Options) { super();
         this.mode = mode;
         this.shell = options.shell ?? null;
         this.script = options.script ?? '';
         this.program = options.program ?? { executable: '', args: [] };
         this.marker = Command.token();
+        this.vOrdinal = options.ordinal ?? 1;
     }
 
     /**
@@ -57,19 +60,25 @@ export class Command extends Events<Command.EventMap> {
      * never the death of the shell, and a shell that dies is reported by the task that owns it. A
      * command with no shell fails as soon as it runs, instead of waiting for output that can never
      * come.
+     *
+     * @remarks The ordinal travels with every line the command emits, so the task never has to invent
+     * which of its instructions a line belongs to.
+     *
+     * @param ordinal - The position of the instruction inside its task, starting at 1.
      */
-    public static inShell(shell: Command.Shell | null, script: string): Command {
-        return new Command('shell', { shell: shell ?? undefined, script });
+    public static inShell(shell: Command.Shell | null, script: string, ordinal: number = 1): Command {
+        return new Command('shell', { shell: shell ?? undefined, script, ordinal });
     }
 
     /**
      * Creates a command that runs a program in a process of its own, where nothing in the arguments
      * nor in the working directory can be reinterpreted by a shell.
      * @param program - The program to run.
+     * @param ordinal - The position of the instruction inside its task, starting at 1.
      * @returns The command, not yet started.
      */
-    public static asProgram(program: Command.Program): Command {
-        return new Command('program', { program });
+    public static asProgram(program: Command.Program, ordinal: number = 1): Command {
+        return new Command('program', { program, ordinal });
     }
 
     /**
@@ -187,6 +196,11 @@ export class Command extends Events<Command.EventMap> {
     /** The human readable form of this instruction, used to describe it when it fails. **/
     public get label(): string {
         return this.mode === 'shell' ? this.script : Command.format(this.program);
+    }
+
+    /** The position of this instruction inside its task, starting at 1, carried by every line it emits. **/
+    public get ordinal(): number {
+        return this.vOrdinal;
     }
 
     /**
@@ -326,7 +340,8 @@ export class Command extends Events<Command.EventMap> {
     }
 
     /**
-     * Emits the complete lines a buffer holds from a given cursor.
+     * Emits the complete lines a buffer holds from a given cursor, each carrying the ordinal of the
+     * instruction it belongs to.
      * @param buffer - The accumulated output of the stream.
      * @param cursor - Where the previous call stopped.
      * @param event - The event each line is emitted with.
@@ -339,7 +354,7 @@ export class Command extends Events<Command.EventMap> {
 
         for (const line of buffer.slice(cursor, end).split('\n')) {
             const text = line.trim();
-            if (text) this.emit(event, text);
+            if (text) this.emit(event, text, this.vOrdinal);
         }
         return end;
     }
@@ -419,7 +434,9 @@ export namespace Command {
     export interface Options {
         shell?: Command.Shell,
         script?: string,
-        program?: Command.Program
+        program?: Command.Program,
+        /** The position of the instruction inside its task, starting at 1, carried by every line it emits. */
+        ordinal?: number
     }
 
     /**
@@ -455,9 +472,13 @@ export namespace Command {
         time: number;
     }
 
+    /**
+     * The events of a command: a line of stdout, a line of stderr, both carrying the ordinal of the
+     * instruction they belong to, and the single verdict that settles it.
+     */
     export type EventMap = {
-        log: [message: string];
-        err: [message: string];
+        log: [message: string, ordinal: number];
+        err: [message: string, ordinal: number];
         end: [verdict: Verdict];
     };
 }

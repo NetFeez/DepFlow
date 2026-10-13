@@ -4,7 +4,7 @@
  * @license Apache-2.0
  */
 
-import { Logger } from "@netfeez/vterm";
+import { ConsoleTransport, Engine } from '@netfeez/vterm';
 
 import TestContext from "./TestContext.js";
 import _Utils from "./Utils.js";
@@ -12,7 +12,8 @@ import _Utils from "./Utils.js";
 export { _Utils as utils };
 
 export class TestSuite {
-    protected readonly logger: Logger
+    protected readonly engine: Engine
+    protected readonly transport: ConsoleTransport
 
     protected vName: string;
     protected vTests: TestSuite.TestEntry[] = [];
@@ -20,18 +21,20 @@ export class TestSuite {
     protected vFails: number = 0;
 
     /**
-     * Creates a test suite with a cleaned name and its own logger.
+     * Creates a test suite with a cleaned name and its own engine.
      * @param name - The display name of the suite (trimmed and lower-cased).
      */
     public constructor(name: string) {
         this.vName = TestSuite.cleanName(name);
-        this.logger = new Logger({ name: this.prefix });
+        this.engine = new Engine({ name: this.prefix, renderer: { columns: () => process.stdout.columns ?? 100 } });
+        this.transport = new ConsoleTransport();
+        this.transport.attach(this.engine);
     }
 
     /** The trimmed, lower-cased name of the suite. */
     public get name(): string { return this.vName; }
 
-    /** The logger prefix used for suite messages. */
+    /** The engine prefix used for suite messages. */
     public get prefix(): string { return `suit:${this.name}`; }
 
     /** How many cases of this suite passed. */
@@ -81,24 +84,24 @@ export class TestSuite {
      */
     public async test(description: string, test: TestSuite.Test): Promise<boolean> {
         const logPrefix = '&C(#FFB4DC)'
-        const context = new TestContext(this.logger, this.name, `${logPrefix}│  `);
+        const context = new TestContext(this.engine, this.name, `${logPrefix}│  `);
 
-        this.logger.info(`${logPrefix}╭─────────────────────────────────────────────`);
-        this.logger.info(`${logPrefix}│ &C6${TestSuite.Utils.splitTexts(description, 44).join(`\n${logPrefix}│ &C6`)}`);
-        this.logger.info(`${logPrefix}├─────────────────────────────────────────────`);
+        this.engine.info(`${logPrefix}╭─────────────────────────────────────────────`);
+        this.engine.info(`${logPrefix}│ &C6${TestSuite.Utils.splitTexts(description, 44).join(`\n${logPrefix}│ &C6`)}`);
+        this.engine.info(`${logPrefix}├─────────────────────────────────────────────`);
         let escaped: boolean = false;
         try {
             await test.call(context, context);
             if (context.passed) {
-                this.logger.log(`${logPrefix}│ &C2✔ Test passed`); 
+                this.engine.log(`${logPrefix}│ &C2✔ Test passed`); 
             } else {
-                this.logger.warn(`${logPrefix}│ &C3⚠ Test finished without explicit done()`);
+                this.engine.warn(`${logPrefix}│ &C3⚠ Test finished without explicit done()`);
             }
         } catch (error) {
             escaped = true;
             const stack = error instanceof Error ? error.stack ?? error.message : String(error);
-            this.logger.error(`${logPrefix}│ &C1✖ ${stack.split('\n').join(`\n${logPrefix}│ &C1`)}`);
-        } finally { this.logger.info(`${logPrefix}╰─────────────────────────────────────────────`); }
+            this.engine.error(`${logPrefix}│ &C1✖ ${stack.split('\n').join(`\n${logPrefix}│ &C1`)}`);
+        } finally { this.engine.info(`${logPrefix}╰─────────────────────────────────────────────`); }
         return !escaped && context.passed === true;
     }
 
