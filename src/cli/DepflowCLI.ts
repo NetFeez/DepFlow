@@ -48,7 +48,7 @@ export const options = new Flags({
     }
 });
 
-export class DepFlowCLI extends CLI {
+export class DepflowCLI extends CLI {
     protected readonly projectRoot: string;
 
     public constructor(
@@ -121,10 +121,10 @@ export class DepFlowCLI extends CLI {
         };
     }
 }
-export namespace DepFlowCLI {
-    export type Exec = (this: DepFlowCLI, command: string, args: string[], flags: Options) => Promise<void> | void;
+export namespace DepflowCLI {
+    export type Exec = (this: DepflowCLI, command: string, args: string[], flags: Options) => Promise<void> | void;
 
     /** The values of the flags accepted by the CLI. **/
     export type Options = typeof options.infer;
 }
-export default DepFlowCLI;
+export default DepflowCLI;

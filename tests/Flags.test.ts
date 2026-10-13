@@ -7,7 +7,7 @@
 import TestSuite from '@TestSuite/TestSuite.js';
 import type TestContext from '@TestSuite/TestContext.js';
 
-import { options as modes } from '../src/cli/DepFLowCLI.js';
+import { options as modes } from '../src/cli/DepflowCLI.js';
 import Flags from '../src/cli/Flags.js';
 
 const suite = new TestSuite('cli flags');

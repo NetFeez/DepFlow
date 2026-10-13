@@ -13,7 +13,7 @@ import OutputPolicy from '../src/task/OutputPolicy.js';
 import Task from '../src/task/Task.js';
 import Git from '../src/dependency/Git.js';
 import NpmDependency from '../src/dependency/NpmDependency.js';
-import { options } from '../src/cli/DepFLowCLI.js';
+import { options } from '../src/cli/DepflowCLI.js';
 import schema from '../src/schema/schema.js';
 import { body, captureOutput, createTemp, readEvidence, removeTemp, runCli, strip, unmarked } from './utils.js';
 

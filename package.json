@@ -5,7 +5,8 @@
   "main": "dist/cli/bin.js",
   "type": "module",
   "bin": {
-    "dep": "dist/cli/bin.js"
+    "dep": "dist/cli/bin.js",
+    "depflow": "dist/cli/bin.js"
   },
   "scripts": {
     "clean": "node ./scripts/clean.mjs",

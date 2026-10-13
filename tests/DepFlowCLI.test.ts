@@ -6,7 +6,7 @@
 import TestSuite from '@TestSuite/TestSuite.js';
 import { File, Path } from '@netfeez/common-node';
 
-import DepFlowCLI, { options } from '../src/cli/DepFLowCLI.js';
+import DepFlowCLI, { options } from '../src/cli/DepflowCLI.js';
 import Actions from '../src/cli/Actions.js';
 import Config from '../src/config/Config.js';
 import { body, captureOutput, createGitFixture, createTemp, lockFile, plain, removeTemp, runCli, strip, unlockFile } from './utils.js';

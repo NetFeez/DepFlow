@@ -6,7 +6,7 @@
  */
 import Logger, { type Engine } from "@netfeez/vterm";
 
-import DepFlowCLI, { options } from "./DepFLowCLI.js";
+import DepflowCLI, { options } from "./DepflowCLI.js";
 import type Flags from "./Flags.js";
 
 const skip = 2;
@@ -39,7 +39,7 @@ function fail(out: Engine | Logger, error: any): void {
     process.exitCode = 1;
 }
 
-let parsed: Flags.Result<DepFlowCLI.Options> | undefined;
+let parsed: Flags.Result<DepflowCLI.Options> | undefined;
 try { parsed = options.parse(argsList); }
 catch (error: any) { fail(new Logger(), error); }
 
@@ -47,13 +47,13 @@ catch (error: any) { fail(new Logger(), error); }
 // to run and no CLI to run it with. The process still ends here, with the status `fail` marked.
 if (parsed !== undefined) {
     const { args, flags } = parsed;
-    const cli = new DepFlowCLI(flags.flow);
+    const cli = new DepflowCLI(flags.flow);
 
     try {
         if (commandName !== null) {
             const command = cli.getCommand(commandName);
             if (command) {
-                const exec = command.exec as DepFlowCLI.Exec;
+                const exec = command.exec as DepflowCLI.Exec;
                 await exec.call(cli, commandName, args, flags);
             } else {
                 cli.out.error(`Unknown command: ${commandName}`);
