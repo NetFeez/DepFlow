@@ -7,6 +7,7 @@ import TestSuite from '@TestSuite/TestSuite.js';
 import { File, Path } from '@netfeez/common-node';
 
 import DepFlowCLI, { options } from '../src/cli/DepFLowCLI.js';
+import Actions from '../src/cli/Actions.js';
 import Config from '../src/config/Config.js';
 import { body, captureOutput, createGitFixture, createTemp, lockFile, plain, removeTemp, runCli, strip, unlockFile } from './utils.js';
 
@@ -47,7 +48,7 @@ suite.add('install rejects a non-matching dependency name', async (context) => {
         const file = await configWith(dir);
         const cli = new DepFlowCLI(file);
         try {
-            await cli.commandInstall('install', ['zeta']);
+            await Actions.install(cli.context, ['zeta']);
             context.fail('expected the install to reject the unknown name');
         } catch (error) {
             context.expect((error as Error).message).equals('Specified dependencies not found.');
@@ -63,7 +64,7 @@ suite.add('install rejects an empty dependency set', async (context) => {
         await File.write(file, JSON.stringify({ dependencies: [] }));
         const cli = new DepFlowCLI(file);
         try {
-            await cli.commandInstall('install', []);
+            await Actions.install(cli.context, []);
             context.fail('expected the install to reject an empty dependency set');
         } catch (error) {
             context.expect((error as Error).message).equals('No dependencies to install.');
@@ -81,7 +82,7 @@ suite.add('remove uninstalls artifacts and drops the config entry', async (conte
         await File.write(Path.join(target, 'file.txt'), 'content');
 
         const cli = new DepFlowCLI(file);
-        await cli.commandRemove('remove', ['alpha']);
+        await Actions.remove(cli.context, ['alpha']);
 
         const loaded = await Config.load(file);
         context.expect(loaded.data.dependencies.length).equals(0);
@@ -96,7 +97,7 @@ suite.add('remove rejects an unknown identifier', async (context) => {
         const file = await configWith(dir);
         const cli = new DepFlowCLI(file);
         try {
-            await cli.commandRemove('remove', ['zeta']);
+            await Actions.remove(cli.context, ['zeta']);
             context.fail('expected the remove to reject the unknown name');
         } catch (error) {
             context.expect((error as Error).message).equals('Dependency "zeta" not found.');
@@ -111,7 +112,7 @@ suite.add('add persists the dependency and the editor schema', async (context) =
         const file = Path.join(dir, 'depflow.json');
         await File.write(file, JSON.stringify({ dependencies: [] }));
         const cli = new DepFlowCLI(file);
-        await cli.commandAdd('add', ['https://github.com/netfeez/omega.git']);
+        await Actions.add(cli.context, ['https://github.com/netfeez/omega.git']);
 
         const loaded = await Config.load(file);
         context.expect(loaded.data.dependencies.length).equals(1);
@@ -142,9 +143,9 @@ suite.add('add rejects a name already taken by another dependency', async (conte
         const file = Path.join(dir, 'depflow.json');
         await File.write(file, JSON.stringify({ dependencies: [] }));
         const cli = new DepFlowCLI(file);
-        await cli.commandAdd('add', [ 'https://github.com/netfeez/omega.git', 'omega' ]);
+        await Actions.add(cli.context, [ 'https://github.com/netfeez/omega.git', 'omega' ]);
         try {
-            await cli.commandAdd('add', [ 'https://github.com/netfeez/other.git', 'omega' ]);
+            await Actions.add(cli.context, [ 'https://github.com/netfeez/other.git', 'omega' ]);
             context.fail('expected the add to reject the taken name');
         } catch (error) {
             context.expect((error as Error).message).includes('already exists');
@@ -164,7 +165,7 @@ suite.add('add rejects a repository that is not clonable', async (context) => {
         await File.write(file, JSON.stringify({ dependencies: [] }));
         const cli = new DepFlowCLI(file);
         try {
-            await cli.commandAdd('add', [ 'netfeez/omega' ]);
+            await Actions.add(cli.context, [ 'netfeez/omega' ]);
             context.fail('expected the add to reject the repository');
         } catch (error) {
             context.expect((error as Error).message).includes('clonable git repository');
@@ -183,7 +184,7 @@ suite.add('add requires a name when the repository is not a github one', async (
         await File.write(file, JSON.stringify({ dependencies: [] }));
         const cli = new DepFlowCLI(file);
         try {
-            await cli.commandAdd('add', [ 'git@gitlab.com:netfeez/omega.git' ]);
+            await Actions.add(cli.context, [ 'git@gitlab.com:netfeez/omega.git' ]);
             context.fail('expected the add to reject the unknown name derivation');
         } catch (error) {
             context.expect((error as Error).message).includes('name');
@@ -199,7 +200,7 @@ suite.add('add persists a local repository under the given name', async (context
         const file = Path.join(dir, 'depflow.json');
         await File.write(file, JSON.stringify({ dependencies: [] }));
         const cli = new DepFlowCLI(file);
-        await cli.commandAdd('add', [ origin, 'omega' ]);
+        await Actions.add(cli.context, [ origin, 'omega' ]);
 
         const loaded = await Config.load(file);
         context.expect(loaded.data.dependencies.length).equals(1);
@@ -223,7 +224,7 @@ suite.add('list tells an installed dependency from a missing one', async (contex
         await File.ensureDir(Path.join(dir, '.depflow', 'alpha'));
 
         const cli = new DepFlowCLI(file);
-        const captured = await captureOutput(() => cli.list('list', []));
+        const captured = await captureOutput(() => Actions.list(cli.context, []));
 
         // The decoration lives inside the width the renderer is given, so an entry wraps within it: every
         // space the render put in, the filler between the wrapped pieces among them, is taken out of both
@@ -244,7 +245,7 @@ suite.add('install brings the dependency to the revision of its tag', async (con
         await File.write(file, JSON.stringify({ dependencies: [ { name: 'alpha', repo: origin, tag: 'v1' } ] }));
 
         const cli = new DepFlowCLI(file);
-        await cli.commandInstall('install', []);
+        await Actions.install(cli.context, []);
 
         const checkout = Path.join(dir, '.depflow', 'alpha', 'version.txt');
         context.expect(await File.read(checkout, 'utf-8')).equals('v1');
@@ -261,7 +262,7 @@ suite.add('reports no success when the acquisition of a dependency fails', async
         }));
 
         const cli = new DepFlowCLI(file);
-        const captured = await captureOutput(() => cli.commandInstall('install', []));
+        const captured = await captureOutput(() => Actions.install(cli.context, []));
 
         context.expect(captured.error !== undefined).equals(true);
         const text = strip(captured.text);

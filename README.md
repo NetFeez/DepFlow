@@ -1,236 +1,526 @@
-# DepFlow — Dependency Flow Manager
+# DepFlow
 
-DepFlow is a focused dependency orchestration tool that lets projects consume Git repositories and NPM packages as managed dependencies. It simplifies building, extracting, and mapping artifacts into your application (for example, populating an `importmap` or TypeScript `paths`).
+DepFlow turns Git repositories and NPM packages into managed dependencies of a project: it fetches
+them into a single `.depflow` folder, runs a build pipeline over each one, and wires the resulting
+artifacts into the project through path aliases. Those aliases are then written into a TypeScript
+`tsconfig` and a browser `importmap`, and the built files can be rewritten to point either at the
+local artifacts or at their CDN counterparts.
 
-Key goals:
-- Keep repository-sourced modules reproducible and buildable.
-- Provide automatic path/importmap resolution for browser and TypeScript workflows.
-- Support lightweight builder pipelines for extracted artifacts.
+The configuration is a single **YAML** file, `depflow.yml` by default. JSON is supported as a
+secondary format for tooling, and the two can be converted into each other from the CLI.
 
 ---
 
 ## Features
-- Git-based dependencies with optional build pipelines
-- NPM dependency extraction and local mirroring
-- Automatic `tsconfig` paths and browser `importmap` generation via `dep sync`
-- Flexible resolver aliases for local and CDN targets
-- Reproducible checkouts: every install lands on the tag the configuration asks for
+
+- Git dependencies cloned at a pinned revision and rebuilt on demand.
+- NPM dependencies installed into the flow folder and built the same way.
+- Ordered build pipelines per dependency: run shell commands, extract files, transform content.
+- A resolver that maps aliases to local and CDN targets.
+- `tsconfig` `paths` and browser `importmap` generated from those aliases.
+- Import rewriting of the built files, with a watch mode.
+- Three run modes (`default`, `--verbose`, `--silent`) and optional decoration.
+- An evidence trail: the complete output of every command is written under `.logs` in every mode.
+- Named actions runnable with `dep run`.
+- Configuration conversion between YAML and JSON.
 
 ---
 
 ## Installation
 
-Install globally with npm to use the CLI system-wide:
-
 ```bash
-npm install -g @netfeez/depflow
+npm install -g depflow
 ```
 
-Alternatively, add it as a dev-dependency for project-specific usage.
+Or add it as a project dev-dependency and invoke the `dep` binary from there.
 
 ---
 
 ## Quick Start
 
-1. Create a configuration file, `depflow.yml` (or any other name, passed with `--flow`).
-2. Run `dep install` to fetch and build all configured dependencies.
-3. Run `dep sync` to update `tsconfig` paths and `importmap` (if configured).
+### Requirements
 
-CLI examples:
+DepFlow is an ESM-only Node.js package (`"type": "module"`) and needs an LTS Node.js with native
+ECMAScript module support. There is no CommonJS build. `git` and `npm` are used directly, so both
+must be on `PATH` to install the corresponding kinds of dependency.
 
 ```bash
-# install the dependencies declared in depflow.yml
-dep install
-# --flow <file> to use a specific config instead
+# 1. Create a configuration file (default name: depflow.yml)
+#    `dep add` creates it from the defaults and registers the first dependency.
+dep add https://github.com/NetFeez/vizui.git
 
-# sync tsconfig/importmap from the configuration
-dep sync
+# 2. Fetch, build and extract every dependency, then synchronize the aliases
+dep install
+
+# 3. Inspect what is declared and whether its files are in place
+dep list
 ```
+
+`dep install` runs `dep sync` on its own after fetching, so step 2 already writes the `tsconfig`
+paths and the `importmap` when those files are configured.
 
 ---
 
 ## Configuration
 
-DepFlow uses a single configuration file describing where to fetch dependencies and how to build and expose them. The format follows the extension: `.yml` and `.yaml` are read and written as YAML, `.json` as JSON. Without `--flow`, the CLI reads `depflow.yml` from the current working directory.
+DepFlow reads a single configuration file. Its format is chosen by extension:
 
-A YAML config is read as a document, so key order, indentation and the comments of the keys a save does not touch are preserved; a config created from scratch is written in block style, documented with a comment per key, and accompanied by an editor JSON Schema at `.depflow/schema.json`.
+| Extension | Format | Notes |
+|---|---|---|
+| `.yml`, `.yaml` | YAML | The default. The document is preserved across saves. |
+| `.json` | JSON | Secondary format, read and written just as well. |
 
-The minimal structure:
+Without `--flow`, the CLI reads `depflow.yml` from the current working directory. The directory that
+holds the configuration file is the **project root**: every relative path of the configuration is
+resolved against it.
 
-- `outDir` (string): project output root scanned by `rewrite-paths` (and by the watcher). Defaults to `dist`. Extraction targets are *not* relative to it, they are relative to the project root, see [Builder rules](#builder-rules).
-- `tsconfig` (string|null): optional path to TypeScript `tsconfig.json` to update `compilerOptions.paths`.
-- `importmap` (string|null): optional path to write a browser `importmap`.
-- `actions` (object): named pipelines runnable with `dep run <action>`.
-- `dependencies` (array): Git-based dependencies.
-- `npmDependencies` (array): NPM packages to extract files from.
+A YAML config is handled as a document, so key order, indentation and the comments of keys a save
+does not touch survive a round trip. A config created from scratch is written in block style with the
+file header and one comment per key, taken from the schema descriptions, so a generated file
+documents itself.
 
-Each dependency supports `builder` steps (run commands, file extraction, content transformation) and `resolver` entries that map aliases to local or CDN targets.
+The YAML dialect DepFlow reads is block style: non-empty flow collections (`[ ... ]` and `{ ... }`)
+are not supported and are reported as an error when the file is loaded. Write lists and maps as
+indented blocks; the empty `{}` and `[]` the generated file uses are fine. Use JSON if a
+flow-style document is a hard requirement, or let `dep yaml-to-json` produce one.
 
-### Example Configuration
+Whenever the config is saved, DepFlow also refreshes the editor JSON Schema at `.depflow/schema.json`
+and points `$schema` at it, which gives validation and autocompletion in editors that understand JSON
+Schema.
 
-Shown as JSON, which the CLI reads and writes just as well as YAML whenever the file is named `.json`. The extraction targets are shown as absolute paths, which is the only form that survives being copied between machines: a relative one is resolved against the project root, the same as every other relative path of the configuration.
+### Generated configuration
 
-```json
-{
-    "outDir": ".",
-    "tsconfig": "tsconfig.web.json",
-    "importmap": "public/importmap.json",
-    "dependencies": [
-        {
-            "name": "NetFeez.Vizui",
-            "repo": "https://github.com/NetFeez/Vizui.git",
-            "tag": "v1.2.0",
-            "builder": [
-                {
-                    "run": [ "npm install", "npm run compile" ]
-                },
-                {
-                    "extract": {
-                        "build/**/*.js": { "to": "/abs/path/to/app/public/lib/vizui/", "map": "^build/" },
-                        "build/**/*.d.ts": { "to": "/abs/path/to/app/public/lib/vizui/", "map": "^build/" }
-                    }
-                }
-            ],
-            "resolver": {
-                "vizui": "public/lib/vizui/vizui.js",
-                "vizui/*": "public/lib/vizui/*"
-            }
-        }
-    ],
-    "npmDependencies": [
-        {
-            "name": "@netfeez/common",
-            "version": "latest",
-            "builder": [
-                {
-                    "extract": {
-                        "build/**/*.js": { "to": "/abs/path/to/app/public/lib/common/", "map": "^build/" },
-                        "build/**/*.d.ts": { "to": "/abs/path/to/app/public/lib/common/", "map": "^build/" }
-                    }
-                }
-            ],
-            "resolver": {
-                "@netfeez/common": "public/lib/common/index.js",
-                "@netfeez/common/*": "public/lib/common/*"
-            }
-        }
-    ]
-}
+A freshly generated `depflow.yml` looks like this:
+
+```yaml
+# Depflow Configuration File
+# You can use the Red Hat extension for JSON schema validation in VSCode: "$schema: .depflow/schema.json"
+
+
+# Path to the JSON Schema describing the configuration. Used by editors and tools to provide validation, autocompletion and other features.
+$schema: .depflow/schema.json
+# Output directory for built files. Can be relative or absolute. Defaults to "dist".
+outDir: dist
+# Path to the tsconfig.json file. Can be relative or absolute. Defaults to "tsconfig.json".
+tsconfig: null
+# Path to the importmap.json file. Can be relative or absolute. Defaults to "importmap.json".
+importmap: null
+# Named build actions. Each action runs a pipeline of run, extract and transform steps.
+actions: {}
+# Mapping of dependency names to their resolution targets (local file or CDN). Paths are resolved relative to this folder.
+resolver: {}
+# Git dependencies to clone and build, each an object with a name and a repo.
+dependencies: []
+# NPM dependencies to install and build, each an object with a name and a version.
+npmDependencies: []
 ```
+
+### Top-level keys
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `$schema` | string | `.depflow/schema.json` | Path to the JSON Schema used by editors. Refreshed on every save. |
+| `outDir` | string | `dist` | Output root scanned by `rewrite-paths` and its watcher. Relative or absolute. |
+| `tsconfig` | string \| null | `null` | Path to a `tsconfig.json` whose `compilerOptions.paths` `sync` updates. When `null`, synchronization of the tsconfig is skipped. |
+| `importmap` | string \| null | `null` | Path to an `importmap.json` that `sync` writes. When `null`, synchronization of the import map is skipped. |
+| `actions` | object | `{}` | Named build pipelines runnable with `dep run <action>`. |
+| `resolver` | object | `{}` | Aliases shared by the whole project, merged with each dependency's own `resolver`. |
+| `dependencies` | array | `[]` | Git dependencies. |
+| `npmDependencies` | array | `[]` | NPM dependencies. |
+
+Streaming collections default to a fresh empty value on every load, so a processed document never
+shares state with the schema.
+
+### Dependencies
+
+A **git dependency** is cloned into `.depflow/<name>` and rebuilt from its `tag` on every install:
+
+```yaml
+dependencies:
+  - name: NetFeez.vizui
+    repo: https://github.com/NetFeez/vizui.git
+    tag: main
+    builder: []
+    resolver: {}
+```
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `name` | string | — (required) | Identity of the dependency. See [Dependency identity](#dependency-identity). |
+| `repo` | string | — (required) | Any value `git clone` accepts, always ending in `.git`. |
+| `tag` | string | `main` | Tag, branch or commit the checkout is left on. |
+| `builder` | array | `[]` | Build pipeline applied after cloning. |
+| `resolver` | object | `{}` | Aliases contributed by this dependency. |
+
+An **NPM dependency** is installed into `.depflow/node_modules/<name>` and built the same way:
+
+```yaml
+npmDependencies:
+  - name: "@netfeez/common"
+    version: latest
+    builder: []
+    resolver: {}
+```
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `name` | string | — (required) | Package name, optionally scoped. |
+| `version` | string | — (required) | Version or semver range to install. |
+| `builder` | array | `[]` | Build pipeline applied after installing. |
+| `resolver` | object | `{}` | Aliases contributed by this dependency. |
+
+Git dependencies are installed before NPM dependencies.
 
 ### Dependency identity
 
-The `name` of a dependency is its identity, not a path: it is a single path segment, and it is also the
-name of its checkout folder inside `.depflow`. A name may not be a path, may not start with a dot, and may
-not be one of the names the flow folder reserves for itself (`schema.json` and `node_modules`).
+The `name` of a dependency is an identity, not a path:
 
-The `repo` of a git dependency is any value `git clone` accepts: a URL with its scheme, an SSH address or a
-local path of a repository. It always carries the `.git` suffix, whichever transport it comes in. `tag` is the
-revision the checkout lands on after cloning and after every reinstall; it defaults to `main`.
+- A git name is a **single path segment** (letters, digits, `.`, `_`, `-`), and it is also the name of
+  its checkout folder inside `.depflow`. It may not be `schema.json` or `node_modules`, the two names
+  the flow folder reserves for itself.
+- An NPM name is a package name, optionally scoped (`@scope/name`).
 
-### Builder rules
+The name of a git dependency can be derived from its repository only when that repository is a GitHub
+one, where it becomes `<user>.<name>` (for example `NetFeez.vizui`). For any other repository the
+name has to be given explicitly to `dep add`.
 
-A pipeline is an ordered list of steps, each of them exactly one of:
+### Build pipelines
 
-- `run`: a string or a list of shell commands executed inside the dependency checkout. It accepts
-  `maxTimeMs` (deadline in milliseconds, `-1` for no deadline, defaults to `60000`) and `allowFails`
-  (whether a failed command is tolerated, defaults to `false`).
-- `extract`: a mapping of source globs to extraction entries, or a destination folder as a shorthand for
-  `**/*` → that folder. The globs are matched against the folder the pipeline works in (the dependency
-  checkout, or the project itself for a `dep run` action) and an entry is a destination (`to`) plus,
-  optionally, a `map` transformation applied to the destination path and a `transform` transformation
-  applied to the content of the files. A relative `to` is resolved against the project root and an
-  absolute one is used as it stands, so a pipeline reads from the dependency and deposits into the
-  project. `map` runs against the *relative* path of the matched file, inside the destination.
-- `transform`: a `glob` plus a `search`/`replace` transformation applied in place to the matched files.
+The `builder` of a dependency, and each entry of a named `action`, is an ordered list of steps. Every
+step is an object carrying exactly one of `run`, `extract` or `transform`. A step that fails without
+tolerating its failures stops the pipeline, and the steps after it are reported as steps that never
+ran.
 
-Every transformation (`map`, `transform`, and the in-place `transform` step) takes one of two forms, and
-they do not mean the same thing:
+**`run`** executes one shell command, or a list of them, in the pipeline's working directory, which is
+the dependency checkout for an install and the project root for a `dep run` action:
 
-- a **string** is a pattern to *remove*: `"^build/"` strips that prefix from the path of every matched
-  file, globally;
-- an **object** `{ "search": ..., "flags": ..., "replace": ... }` is the only form that *substitutes*
-  something: `search` is the pattern, `replace` what takes its place, and `flags` defaults to `g`.
-
-```json
-{ "map": "^build/" }
-{ "map": { "search": "^build/(.*)\\.js$", "replace": "$1.js" } }
+```yaml
+builder:
+  - run: npm run build
+  - run:
+      - npm ci
+      - npm run compile
+    maxTimeMs: 120000
+    allowFails: false
 ```
 
-An object whose `replace` is empty removes the matches exactly as the string form does.
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `run` | string \| string[] | — (required) | Command or commands to execute, in order. |
+| `maxTimeMs` | number | `60000` | Deadline for the whole step in milliseconds. `-1` disables the limit. |
+| `allowFails` | boolean | `false` | Whether a failed command is tolerated, so the step completes anyway. |
+
+**`extract`** copies files matched by source globs from the working directory into a destination:
+
+```yaml
+builder:
+  - extract:
+      "build/**/*.js":
+        to: dist/vizui
+        map: "^build/"
+      "build/**/*.d.ts":
+        to: dist/vizui
+        map: "^build/"
+```
+
+The `extract` value is either a mapping of glob → entry, or a single string used as a shorthand for
+extracting every file (`**/*`) into that folder. Each entry is:
+
+| Key | Type | Meaning |
+|---|---|---|
+| `to` | string — required | Destination folder. A relative path is resolved against the project root; an absolute one is used as it stands. |
+| `map` | transform | Transformation applied to the destination path of each file, relative to the working directory. |
+| `transform` | transform | Transformation applied to the content of each file. |
+
+**`transform`** applies a search/replace transformation in place to every file matched by a glob:
+
+```yaml
+builder:
+  - transform:
+      glob: "build/**/*.js"
+      search: "process\\.env\\.NODE_ENV"
+      replace: "\"production\""
+      flags: g
+```
+
+### Transformations
+
+`map`, the `transform` of an extraction entry and the in-place `transform` step all accept one of two
+forms, and they do not mean the same thing:
+
+- a **string** is a pattern whose matches are **removed**. `"^build/"` strips that prefix from every
+  matched path.
+- an **object** is the only form that **substitutes**: `search` is the pattern, `replace` what takes
+  its place, and `flags` (default `g`) is applied to the regular expression. An object with an empty
+  or absent `replace` removes the matches, exactly as the string form does.
+
+```yaml
+map: "^build/"
+transform:
+  search: "^\\.\\/(.*)$"
+  replace: "$1"
+  flags: g
+```
 
 ### Resolver entries
 
-The `resolver` of a dependency, and the `resolver` of the configuration, are mappings of an alias to its
-target. The target is either a string path or an object with these keys:
+The `resolver` of the project and the `resolver` of a dependency are mappings of an alias to its
+target. The target is either a plain string path or an object:
 
-- `local` (string, required): the path the alias resolves to, resolved against the project root. `sync`
-  turns it into the `tsconfig` `paths` entry (and into the `importmap` entry unless `--cdn` is given),
-  and `rewrite-paths` rewrites the built files' imports that point at it.
-- `type` (string, optional): the target holding the type declarations. It becomes the *first* entry of
-  the generated `paths` array, so the editor finds the `.d.ts` next to the value. Unlike `local`, it is
-  not resolved against the project root, so it has to be an absolute path.
-- `cdn` (string, optional): the URL that replaces `local` when `--cdn` is given.
+```yaml
+resolver:
+  "@utils": src/utils
+  "@app/*": src/app
+  "@vizui":
+    local: dist/vizui/index.js
+    type: /abs/path/types/vizui.d.ts
+    cdn: https://cdn.example.com/vizui/index.js
+```
 
-A `*` suffix on the alias turns it into a mapping, so `vizui/*` also covers `vizui/Button`.
+| Key | Type | Meaning |
+|---|---|---|
+| `local` | string — required | The path the alias resolves to, resolved against the project root. `sync` turns it into the `tsconfig` `paths` entry and the `importmap` entry, and `rewrite-paths` rewrites imports that point at it. With `--cdn`, an alias that also declares a `cdn` target uses it instead. |
+| `type` | string | The target holding the type declarations. It becomes the **first** entry of the generated `paths` array, so the editor finds the `.d.ts`. Unlike `local`, it is not resolved against the project root, so it has to be an absolute path. |
+| `cdn` | string | The URL that replaces `local` when `--cdn` is given. |
+
+An alias ending in `/` or `/*` is a **wildcard** alias: `@app/*` also covers `@app/Button`. Dependency
+resolvers are compiled before the project resolver, so a project entry with the same alias wins.
+
+### Named actions
+
+`actions` maps a name to a list of `run`, `extract` and `transform` steps, run in the project root by
+`dep run <name>`:
+
+```yaml
+actions:
+  build:
+    - run: npm run build
+    - extract:
+        "dist/**/*.js":
+          to: public/lib
+          map: "^dist/"
+  lint:
+    - run: npm run lint
+    - run: npm run typecheck
+```
+
+### Full example
+
+```yaml
+$schema: .depflow/schema.json
+outDir: dist
+tsconfig: tsconfig.json
+importmap: public/importmap.json
+
+resolver:
+  "@app/*": src/app
+
+actions:
+  build:
+    - run: npm run build
+
+dependencies:
+  - name: NetFeez.vizui
+    repo: https://github.com/NetFeez/vizui.git
+    tag: v1.2.0
+    builder:
+      - run:
+          - npm ci
+          - npm run compile
+      - extract:
+          "build/**/*.js":
+            to: public/lib/vizui
+            map: "^build/"
+          "build/**/*.d.ts":
+            to: public/lib/vizui
+            map: "^build/"
+    resolver:
+      "@vizui": public/lib/vizui/vizui.js
+      "@vizui/*": public/lib/vizui
+
+npmDependencies:
+  - name: "@netfeez/common"
+    version: latest
+    builder:
+      - extract:
+          "build/**/*.js":
+            to: public/lib/common
+            map: "^build/"
+    resolver:
+      "@netfeez/common": public/lib/common/index.js
+      "@netfeez/common/*": public/lib/common
+```
+
+The same configuration can be kept as JSON when the file is named `.json`. The command reads the
+config named by `--flow` (default `depflow.yml`) and writes a sibling file; its optional positional
+argument is the **output** path, not the input:
+
+```bash
+dep yaml-to-json                      # reads depflow.yml, writes depflow.json
+dep json-to-yaml --flow depflow.json  # reads depflow.json, writes depflow.yaml
+dep yaml-to-json build/depflow.json   # reads depflow.yml, writes build/depflow.json
+```
 
 ---
 
 ## CLI Reference
 
-Use the distribution script in `dist/cli/bin.js` or install the package globally.
+```
+dep <command> [arguments] [flags]
+```
 
-- `install`: Clone, build and extract artifacts for all dependencies in your config.
-- `sync`: Generate/update `tsconfig` paths and browser `importmap` according to `resolver` entries.
-- `list`: Show configured dependencies and whether each one is installed.
-
-Use `node ./dist/cli/bin.js <command> --flow <config>` when running locally from the repository.
+The **first token is always the command name**; global flags are parsed from the tokens that follow
+it. `dep --flow x install` is read as the command `--flow`, so flags belong after the command:
+`dep install --flow x`.
 
 ### Commands
 
-The CLI exposes the following commands (all commands accept the global `--flow <file>` flag to specify a custom configuration file):
-
 | Command | Usage | Description |
 |---|---|---|
-| `add` | `dep add <repo_url> [name] [--flow <file>]` | Add a git dependency to the configuration file. If the configuration file does not exist it will be created automatically, in the format its extension asks for (default: `depflow.yml`). When the name is omitted it is derived from the repository, which only a GitHub repository allows; any other repository needs the name to be given. A name already taken by another dependency is refused. |
-| `remove` | `dep remove <name\|repo_url> [--flow <file>]` | Remove a dependency by `name` or repository URL and uninstall its local files. An identifier that no dependency declares is an error. |
-| `install` | `dep install [name1 name2 ...] [--flow <file>]` | Clone, build and extract artifacts for all or specific dependencies. Runs `dep sync` after install. A dependency that is already present is brought to the revision of its `tag` instead of being cloned again. |
-| `list` | `dep list [--flow <file>]` | List all dependencies declared in the configuration, telling an `installed` one (its folder is in place under `.depflow`) from a `missing` one. |
-| `rewrite-paths` | `dep rewrite-paths [--watch] [--cdn] [--flow <file>]` | Rewrite built files' paths according to resolver aliases. Use `--watch` to run a watcher; use `--cdn` to apply CDN targets instead of local targets. A built file that cannot be rewritten makes the command fail instead of being left pointing at the source tree. |
-| `sync` | `dep sync [--cdn] [--flow <file>]` | Update `tsconfig` paths and generate `importmap` from resolver aliases. Use `--cdn` to prefer CDN targets when generating the importmap. |
+| `add` | `dep add <repo_url> [name]` | Add a git dependency to the configuration, creating the file from the defaults if it does not exist. The name is derived from the repository when omitted, which only a GitHub repository allows. A name already taken is refused. |
+| `remove` | `dep remove <name\|repo_url>` | Remove a dependency by name (git or npm) or by git repository URL, and uninstall its local files. An identifier no dependency declares is an error. |
+| `install` | `dep install [name...]` | Fetch, build and extract every dependency, or only the named ones. A checkout already in place is updated to its `tag` instead of cloned again. Runs `sync` afterwards. |
+| `run` | `dep run <action>` | Run a named action from `actions`, in the project root. |
+| `list` | `dep list` | List the declared dependencies, marking each one `installed` or `missing`. |
+| `rewrite-paths` | `dep rewrite-paths [--watch] [--cdn]` | Rewrite import specifiers in the built files of `outDir` according to the resolver. A file that cannot be rewritten fails the command. |
+| `sync` | `dep sync [--cdn]` | Write the resolver aliases into the configured `tsconfig` and `importmap`. |
+| `json-to-yaml` | `dep json-to-yaml [output.yaml]` | Convert the config to YAML. The output name is derived from the input name when omitted. |
+| `yaml-to-json` | `dep yaml-to-json [output.json]` | Convert the config to JSON. The output name is derived from the input name when omitted. |
+
+### Console commands
+
+The CLI is built on a small console interface that also carries two commands:
+
+| Command | Description |
+|---|---|
+| `dep help` | Print the global flags and every command, with its usage, description and arguments. The help is written by the terminal and is left untouched by `--silent` and `--decorate=false`. |
+| `dep exit` | Leave the process. |
+
+This build does not drive that interface interactively: the first token of an invocation is always
+taken as the command name, so an empty invocation is reported as an unknown command and the help is
+printed rather than a prompt being opened.
 
 ### Flags
 
-- `--flow <file>` / `-f <file>` / `-p <file>`: Specify an alternate configuration file (for example `depflow.json` or `depflow.yaml`). When omitted, the CLI uses `depflow.yml` in the current working directory; any other file has to be named here.
-- `--cdn`: When present for `sync` or `rewrite-paths`, instructs the tool to use CDN targets from resolver entries instead of `local` targets when generating the `importmap` or rewriting paths.
-- `--watch` / `-w`: For `rewrite-paths` only — run a file watcher that keeps rewriting paths as files change.
+| Flag | Aliases | Default | Description |
+|---|---|---|---|
+| `--flow <file>` | `-p`, `-f` | `depflow.yml` | Configuration file the command operates on. |
+| `--cdn` | — | `false` | Resolve to CDN targets instead of local ones (for `sync` and `rewrite-paths`). |
+| `--watch` | `-w` | `false` | Keep watching the built files and rewriting their paths on every change (`rewrite-paths`). |
+| `--verbose` | `-v` | `false` | Stream the output of every command as it runs, attributed to the command that wrote it. |
+| `--silent` | — | `false` | Say only what failed, one line per failed command. |
+| `--decorate` | — | `true` | Draw boxes, indentation, timestamps, levels and names. Use `--decorate=false` to leave the content alone. |
 
-Every token starting with a dash is a flag, and a flag is the whole token, so short clusters are not expanded (`-abc` is the single flag `-abc`, not `-a -b -c`). A value flag takes the value from the next token when that token is not a flag, or written inline as `--flag=value`; a boolean flag never consumes the next token and only accepts `=true` or `=false` inline. Names are matched with or without their dash prefix, so `-f` and `--flow` reach the same flag. The last occurrence of a flag wins, `--` ends the flags and turns the remaining tokens into positional arguments, and an undeclared flag is reported as an error.
+Flag parsing rules:
 
-Examples:
+- A flag is the whole token; short clusters are not expanded (`-abc` is the single flag `-abc`).
+- Names are matched with or without their dash prefix, so `-f` and `--flow` reach the same flag.
+- A value flag takes the next token as its value when that token is not a flag, or an inline value as
+  `--flag=value`. A boolean flag never consumes the next token and only accepts `=true` or `=false`,
+  so the undecorated form is `--decorate=false`.
+- The last occurrence of a flag wins, `--` ends the flags and turns every remaining token into a
+  positional argument, and an undeclared flag is an error.
 
 ```bash
-# install using custom flow file
-dep install --flow .df.json
-
-# sync using CDN targets for importmap
-dep sync --flow .df.json --cdn
-
-# rewrite paths and start watcher (local targets)
-dep rewrite-paths --flow .df.json --watch
+dep install --flow .df.yml
+dep sync --flow .df.yml --cdn
+dep rewrite-paths --flow .df.yml --watch
+dep run build --decorate=false
 ```
 
 ---
 
-## Build steps in depth
+## Run Modes and the Evidence Trail
 
-A `run` step is the only place where a shell script is interpreted, and it is where the failure semantics
-live:
+Every command a run executes writes its **complete** output to
 
-- every command of the step runs, even after one of them fails, so a build reports the whole picture;
-- `allowFails: true` turns a failed command into information: the step completes and the build continues;
-- `maxTimeMs` is a deadline for the whole step, not per command, and a deadline that is reached fails the
-  step even when `allowFails` is set: the work never finished, so the result is not the one that was asked for.
+```
+.logs/{YYYY}.{MM}.{DD}/[name] {HH}.{mm}.{ss}.{ms}.vlog
+```
 
-The verdict of a step is awaited, never read from a log: a build that cannot do what it was configured to
-do fails, and the failure travels up to whoever asked for the build.
+under the working directory, whatever the mode. The file keeps the format tokens of the logger, so it
+is a complete transcript of the run. What a mode changes is how much of that output reaches the
+screen:
+
+| Mode | Flags | What it shows |
+|---|---|---|
+| Default | *(none)* | One result line per command, and the complete output of a command that failed, under its diagnostic. |
+| Verbose | `--verbose` / `-v` | Every line of every command as it comes, each attributed to the command that wrote it. The buffer is not repeated. |
+| Silent | `--silent` | One line per failed command, and nothing else. |
+
+`--silent` wins over `--verbose` when both are given. `--decorate=false` combines with any mode to
+drop the boxes, indentation, timestamps, levels and names, keeping the color of the markers and the
+diagnostics, which carry information.
+
+Commands that are not part of a pipeline (the git and npm acquisition of a dependency) are reported
+as `C<M>`; the commands inside a pipeline with more than one `run` step are qualified as
+`S<N> · C<M>`, so a command identity is never ambiguous.
+
+---
+
+## How `sync` and `rewrite-paths` Work
+
+`sync` compiles the resolver into aliases and writes them to the configured files:
+
+- the **tsconfig** `compilerOptions.paths` receives one entry per alias, always pointing at the local
+  target. A wildcard alias becomes `<alias>/*`. When a target declares a `type`, the type path is the
+  first element of the array and the local path the second.
+- the **importmap** `imports` receives one entry per alias. A wildcard alias's key keeps a trailing
+  `/`. Local targets are written relative to the directory of the importmap file. With `--cdn`, an
+  alias that declares a `cdn` target uses it; the others keep their local path. Existing `scopes` are
+  preserved.
+
+`rewrite-paths` scans `outDir` for files ending in `.js`, `.ts`, `.jsx`, `.tsx`, `.cjs` or `.mjs`
+and rewrites every `from '...'` specifier whose module path matches an alias:
+
+- in **local** mode the specifier becomes a path relative to the file, written with `/` separators.
+- in **cdn** mode an alias that declares a `cdn` target resolves to that URL; the rest keep their
+  local relative path.
+
+Only `from '...'` specifiers are rewritten; a bare side-effect import such as `import './x'` is not
+touched. `--watch` rewrites once and then keeps rewriting as files change.
+
+---
+
+## Project Layout
+
+```text
+<project root>/
+├── depflow.yml               # the configuration (any name, passed with --flow)
+├── .depflow/                 # the flow folder, owned by DepFlow
+│   ├── <name>/               # one checkout per git dependency
+│   ├── node_modules/         # npm dependencies, installed here and not in the project's
+│   └── schema.json           # the editor JSON Schema, refreshed on every config save
+├── <outDir>/                 # the built files rewrite-paths scans (default: dist)
+└── .logs/                    # the evidence trail, under the working directory
+    └── {YYYY}.{MM}.{DD}/
+        └── [name] {HH}.{mm}.{ss}.{ms}.vlog
+```
+
+The project root is the directory of the configuration file. The flow folder is reserved for
+DepFlow: a dependency name may not be `schema.json` or `node_modules`, may not start with a dot, and
+may not be a path, so no dependency folder can escape `.depflow`.
+
+---
+
+## Development
+
+The project is ESM-only TypeScript, compiled with `tsc` and exercised by a bundled test runner; no
+test framework is installed.
+
+```bash
+npm install     # install the dependencies
+npm run build   # clean and compile src/ into dist/
+npm run dev     # recompile on change (tsc --watch)
+npm test        # compile the tests and run the whole suite
+npm run clean   # remove dist/, dist-test/ and the .tsbuildinfo files
+```
+
+The suite is offline: the git and npm fixtures are local, so the tests need no network. The test
+entry point is `dist-test/tests/index.js`, and `npm test` exits non-zero on any failure.
+
+---
+
+## License
+
+Apache-2.0. See [LICENCE](LICENCE).

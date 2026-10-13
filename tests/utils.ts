@@ -251,7 +251,7 @@ export function body(lines: string[]): string[] {
  *
  * @example
  * ```ts
- * const captured = await captureOutput(() => cli.commandInstall('install', []));
+ * const captured = await captureOutput(() => Actions.install(cli.context, []));
  * context.expect(strip(captured.text)).includes('✘ C1 failed');
  * ```
  **/
