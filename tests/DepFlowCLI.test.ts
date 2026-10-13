@@ -116,7 +116,7 @@ suite.add('add persists the dependency and the editor schema', async (context) =
 
         const loaded = await Config.load(file);
         context.expect(loaded.data.dependencies.length).equals(1);
-        context.expect(loaded.data.dependencies[0].name).equals('netfeez.omega');
+        context.expect(loaded.data.dependencies[0].name).equals('netfeez/omega');
         context.expect(await File.exists(Path.join(dir, '.depflow', 'schema.json'))).ok();
 
         const written = JSON.parse(await File.read(file, 'utf-8'));
@@ -165,7 +165,7 @@ suite.add('add rejects a repository that is not clonable', async (context) => {
         await File.write(file, JSON.stringify({ dependencies: [] }));
         const cli = new DepFlowCLI(file);
         try {
-            await Actions.add(cli.context, [ 'netfeez/omega' ]);
+            await Actions.add(cli.context, [ 'not a repo' ]);
             context.fail('expected the add to reject the repository');
         } catch (error) {
             context.expect((error as Error).message).includes('clonable git repository');
@@ -173,6 +173,21 @@ suite.add('add rejects a repository that is not clonable', async (context) => {
 
         const loaded = await Config.load(file);
         context.expect(loaded.data.dependencies.length).equals(0);
+        context.done();
+    } finally { await removeTemp(dir); }
+});
+
+suite.add('add canonicalizes every github form and derives its name', async (context) => {
+    const dir = await createTemp();
+    try {
+        const file = Path.join(dir, 'depflow.json');
+        await File.write(file, JSON.stringify({ dependencies: [] }));
+        const cli = new DepFlowCLI(file);
+        await Actions.add(cli.context, [ 'netfeez/omega' ]);
+
+        const loaded = await Config.load(file);
+        context.expect(loaded.data.dependencies[0].name).equals('netfeez/omega');
+        context.expect(loaded.data.dependencies[0].repo).equals('https://github.com/netfeez/omega.git');
         context.done();
     } finally { await removeTemp(dir); }
 });

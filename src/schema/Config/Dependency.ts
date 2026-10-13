@@ -15,8 +15,8 @@ export namespace DependencyName {
      */
     const RESERVED = 'schema\\.json|node_modules';
 
-    /** A single path segment: the identity of a git source, also the name of its checkout folder. */
-    export const GIT: RegExp = new RegExp(`^(?!(${RESERVED})$)[A-Za-z0-9][A-Za-z0-9._-]*$`);
+    /** A `user/repo` identity or a single segment: the identity of a git source, also the name of its checkout folder. */
+    export const GIT: RegExp = new RegExp(`^(?!(?:${RESERVED})(?:/|$))[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)?$`);
 
     /** A package name, optionally scoped: the identity of an npm source. */
     export const NPM: RegExp = new RegExp(`^(?!(${RESERVED})$)@?[A-Za-z0-9][A-Za-z0-9._~-]*(/[A-Za-z0-9][A-Za-z0-9._~-]*)?$`);
@@ -31,7 +31,7 @@ export const GitDependency = new Schema({
             type: 'string',
             required: true,
             pattern: DependencyName.GIT,
-            description: 'Unique name used to reference the dependency in flows and path aliases. It is an identity, not a path: a single alphanumeric segment.'
+            description: 'Unique name used to reference the dependency in flows and path aliases. It is an identity, not an arbitrary path: a `<user>/<repo>` pair or a single alphanumeric segment.'
         },
         repo: {
             type: 'string',

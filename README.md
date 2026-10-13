@@ -47,7 +47,7 @@ must be on `PATH` to install the corresponding kinds of dependency.
 ```bash
 # 1. Create a configuration file (default name: depflow.yml)
 #    `dep add` creates it from the defaults and registers the first dependency.
-dep add https://github.com/NetFeez/vizui.git
+dep add NetFeez/vizui
 
 # 2. Fetch, build and extract every dependency, then synchronize the aliases
 dep install
@@ -133,11 +133,11 @@ shares state with the schema.
 
 ### Dependencies
 
-A **git dependency** is cloned into `.depflow/<name>` and rebuilt from its `tag` on every install:
+A **git dependency** is cloned into `.depflow/<user>/<repo>` and rebuilt from its `tag` on every install:
 
 ```yaml
 dependencies:
-  - name: NetFeez.vizui
+  - name: NetFeez/vizui
     repo: https://github.com/NetFeez/vizui.git
     tag: main
     builder: []
@@ -173,16 +173,28 @@ Git dependencies are installed before NPM dependencies.
 
 ### Dependency identity
 
-The `name` of a dependency is an identity, not a path:
+The `name` of a dependency is an identity, not an arbitrary path:
 
-- A git name is a **single path segment** (letters, digits, `.`, `_`, `-`), and it is also the name of
-  its checkout folder inside `.depflow`. It may not be `schema.json` or `node_modules`, the two names
-  the flow folder reserves for itself.
+- A git name is a `<user>/<repo>` pair or a **single path segment** (letters, digits, `.`, `_`, `-`),
+  and it is also the path of its checkout folder inside `.depflow`. It may not lead with
+  `schema.json` or `node_modules`, the two names the flow folder reserves for itself, and it is at
+  most one `/`.
 - An NPM name is a package name, optionally scoped (`@scope/name`).
 
 The name of a git dependency can be derived from its repository only when that repository is a GitHub
-one, where it becomes `<user>.<name>` (for example `NetFeez.vizui`). For any other repository the
+one, where it becomes `<user>/<repo>` (for example `NetFeez/vizui`). For any other repository the
 name has to be given explicitly to `dep add`.
+
+`dep add` accepts a GitHub repository written in any of its usual forms, canonicalizes it to the
+repository git clones from, always ending in `.git`, and derives the name from it when no name is
+given:
+
+```bash
+dep add netfeez/vizui                          # https://github.com/netfeez/vizui.git, name netfeez/vizui
+dep add https://github.com/netfeez/vizui        # https://github.com/netfeez/vizui.git, name netfeez/vizui
+dep add https://github.com/netfeez/vizui.git    # https://github.com/netfeez/vizui.git, name netfeez/vizui
+dep add git@github.com:/netfeez/vizui           # git@github.com:netfeez/vizui.git, name netfeez/vizui
+```
 
 ### Build pipelines
 
@@ -320,7 +332,7 @@ actions:
     - run: npm run build
 
 dependencies:
-  - name: NetFeez.vizui
+  - name: NetFeez/vizui
     repo: https://github.com/NetFeez/vizui.git
     tag: v1.2.0
     builder:
@@ -377,7 +389,7 @@ it. `dep --flow x install` is read as the command `--flow`, so flags belong afte
 
 | Command | Usage | Description |
 |---|---|---|
-| `add` | `dep add <repo_url> [name]` | Add a git dependency to the configuration, creating the file from the defaults if it does not exist. The name is derived from the repository when omitted, which only a GitHub repository allows. A name already taken is refused. |
+| `add` | `dep add <repo> [name]` | Add a git dependency to the configuration, creating the file from the defaults if it does not exist. A GitHub repository may be given as `user/repo`, as an HTTP(S) URL or as an ssh address, with or without the `.git` suffix; it is canonicalized to the URL git clones from. The name is derived from the repository when omitted, which only a GitHub repository allows. A name already taken is refused. |
 | `remove` | `dep remove <name\|repo_url>` | Remove a dependency by name (git or npm) or by git repository URL, and uninstall its local files. An identifier no dependency declares is an error. |
 | `install` | `dep install [name...]` | Fetch, build and extract every dependency, or only the named ones. A checkout already in place is updated to its `tag` instead of cloned again. Runs `sync` afterwards. |
 | `run` | `dep run <action>` | Run a named action from `actions`, in the project root. |
@@ -488,7 +500,7 @@ touched. `--watch` rewrites once and then keeps rewriting as files change.
 <project root>/
 ├── depflow.yml               # the configuration (any name, passed with --flow)
 ├── .depflow/                 # the flow folder, owned by DepFlow
-│   ├── <name>/               # one checkout per git dependency
+│   ├── <user>/<repo>/        # one checkout per git dependency
 │   ├── node_modules/         # npm dependencies, installed here and not in the project's
 │   └── schema.json           # the editor JSON Schema, refreshed on every config save
 ├── <outDir>/                 # the built files rewrite-paths scans (default: dist)
@@ -498,8 +510,8 @@ touched. `--watch` rewrites once and then keeps rewriting as files change.
 ```
 
 The project root is the directory of the configuration file. The flow folder is reserved for
-DepFlow: a dependency name may not be `schema.json` or `node_modules`, may not start with a dot, and
-may not be a path, so no dependency folder can escape `.depflow`.
+DepFlow: a dependency name may not lead with `schema.json` or `node_modules`, may not start with a
+dot, and is at most one `/` (a `<user>/<repo>` pair), so no dependency folder can escape `.depflow`.
 
 ---
 

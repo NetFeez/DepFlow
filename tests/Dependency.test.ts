@@ -51,10 +51,10 @@ function rejectsRepo(repo: unknown): boolean {
     catch { return true; }
 }
 
-suite.add('rejects a name that is a path', async (context) => {
+suite.add('rejects a name that escapes the flow folder', async (context) => {
     const dir = await createTemp();
     try {
-        for (const name of [ '../../pwned', 'nested/name', '..', '.', '/absolute' ])
+        for (const name of [ '../../pwned', 'user/../pwned', 'a/b/c', '..', '.', '/absolute' ])
             context.expect(rejectsName(name)).equals(true);
         context.done();
     } finally { await removeTemp(dir); }
@@ -63,7 +63,7 @@ suite.add('rejects a name that is a path', async (context) => {
 suite.add('rejects a name that is hidden or reserved', async (context) => {
     const dir = await createTemp();
     try {
-        for (const name of [ '.hidden', 'schema.json', 'node_modules' ])
+        for (const name of [ '.hidden', 'schema.json', 'node_modules', 'schema.json/inner', 'node_modules/inner' ])
             context.expect(rejectsName(name)).equals(true);
         context.done();
     } finally { await removeTemp(dir); }
@@ -72,7 +72,7 @@ suite.add('rejects a name that is hidden or reserved', async (context) => {
 suite.add('accepts the names a source can be known by', async (context) => {
     const dir = await createTemp();
     try {
-        for (const name of [ 'omega', 'netfeez.omega', 'my-lib_2.0', 'test.git' ]) {
+        for (const name of [ 'omega', 'netfeez.omega', 'netfeez/omega', 'my-lib_2.0', 'test.git' ]) {
             context.expect(git(name).name).equals(name);
         }
         context.expect(npm('@netfeez/common-node').name).equals('@netfeez/common-node');
@@ -86,6 +86,7 @@ suite.add('keeps the folder of a dependency inside the flow folder', async (cont
     try {
         const flow = Path.join(dir, '.depflow');
         context.expect(new GitDependency(flow, dir, git('omega')).folder).equals(Path.join(flow, 'omega'));
+        context.expect(new GitDependency(flow, dir, git('netfeez/omega')).folder).equals(Path.join(flow, 'netfeez', 'omega'));
         context.expect(new NpmDependency(flow, dir, npm('is-number')).folder).equals(Path.join(flow, 'node_modules', 'is-number'));
         context.done();
     } finally { await removeTemp(dir); }
@@ -157,6 +158,22 @@ suite.add('clones a repository and checks out its tag', async (context) => {
 
         context.expect(await File.exists(Path.join(dependency.folder, 'version.txt'))).ok();
         context.expect(await File.read(Path.join(dependency.folder, 'version.txt'), 'utf-8')).equals('v1');
+        context.done();
+    } finally { await removeTemp(dir); }
+});
+
+suite.add('clones a repository under a user/repo identity', async (context) => {
+    const dir = await createTemp();
+    try {
+        const origin = await createGitFixture(dir, 'v1');
+        const flow = Path.join(dir, '.depflow');
+        const dependency = new GitDependency(flow, dir, git('netfeez/omega', { repo: origin, tag: 'v1' }));
+
+        await dependency.install();
+
+        context.expect(await File.exists(Path.join(flow, 'netfeez', 'omega', 'version.txt'))).ok();
+        await dependency.uninstall();
+        context.expect(await File.exists(Path.join(flow, 'netfeez', 'omega'))).notOk();
         context.done();
     } finally { await removeTemp(dir); }
 });
@@ -308,7 +325,7 @@ suite.add('fails the install when the repository cannot be cloned', async (conte
 suite.add('rejects a repository that is not clonable', async (context) => {
     const dir = await createTemp();
     try {
-        for (const repo of [ '', '   ', 'not a url', 'https://github.com/netfeez/omega' ])
+        for (const repo of [ '', '   ', 'not a url', 'netfeez/', '/omega', 'a/b/c' ])
             context.expect(rejectsRepo(repo)).equals(true);
         context.done();
     } finally { await removeTemp(dir); }
@@ -330,12 +347,35 @@ suite.add('accepts every transport git clones from', async (context) => {
     } finally { await removeTemp(dir); }
 });
 
+suite.add('canonicalizes every form a github repository is given in', async (context) => {
+    const dir = await createTemp();
+    try {
+        for (const repo of [ 'netfeez/omega', 'netfeez/omega.git', 'https://github.com/netfeez/omega', 'https://github.com/netfeez/omega.git' ]) {
+            const parsed = DepUtils.parse(repo);
+            context.expect(parsed.repo).equals('https://github.com/netfeez/omega.git');
+            context.expect(parsed.name).equals('netfeez/omega');
+        }
+        for (const repo of [ 'git@github.com:netfeez/omega', 'git@github.com:/netfeez/omega' ]) {
+            const parsed = DepUtils.parse(repo);
+            context.expect(parsed.repo).equals('git@github.com:netfeez/omega.git');
+            context.expect(parsed.name).equals('netfeez/omega');
+        }
+        for (const repo of [ 'https://gitlab.com/netfeez/omega.git', '/srv/repos/omega.git' ]) {
+            const parsed = DepUtils.parse(repo);
+            context.expect<string>(parsed.repo).equals(repo);
+            context.expect(parsed.name).equals(null);
+        }
+        context.done();
+    } finally { await removeTemp(dir); }
+});
+
 suite.add('derives the name of a github repository only', async (context) => {
     const dir = await createTemp();
     try {
-        context.expect(DepUtils.getRepoName('https://github.com/netfeez/omega.git')).equals('netfeez.omega');
-        context.expect(DepUtils.getRepoName('https://github.com/netfeez/omega')).equals('netfeez.omega');
-        context.expect(DepUtils.getRepoName('git@github.com:netfeez/omega.git')).equals('netfeez.omega');
+        context.expect(DepUtils.getRepoName('https://github.com/netfeez/omega.git')).equals('netfeez/omega');
+        context.expect(DepUtils.getRepoName('https://github.com/netfeez/omega')).equals('netfeez/omega');
+        context.expect(DepUtils.getRepoName('git@github.com:netfeez/omega.git')).equals('netfeez/omega');
+        context.expect(DepUtils.getRepoName('netfeez/omega')).equals('netfeez/omega');
 
         for (const repo of [ 'https://gitlab.com/netfeez/omega.git', '/srv/repos/omega.git' ]) {
             try {

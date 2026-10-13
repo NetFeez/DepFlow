@@ -104,7 +104,7 @@ export namespace Actions {
 
             out.info(`Adding dependency...`);
 
-            DepUtils.repo(repo);
+            repo = DepUtils.parse(repo).repo;
             if (!name) name = DepUtils.getRepoName(repo);
 
             const dep = schema.Dependency.GitDependency.process({ name, repo });
