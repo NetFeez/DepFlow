@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 /**
  * @author NetFeez <netfeez.dev@gmail.com>.
- * @description Command-line entry point: parses arguments and dispatches the invoked command to the CLI.
+ * @description Command-line entry point: hands the tokens of the invocation to the console interface, which
+ *              reads the command, its arguments and its flags, and answers the verdict of the line.
  * @license Apache-2.0
  */
-import Logger, { type Engine } from "@netfeez/vterm";
+
+import type { Engine } from "@netfeez/vterm";
 
 import DepflowCLI from "./DepflowCLI.js";
-import Flags from "./Flags.js";
 
+/** The tokens Node puts in front of the invocation: the interpreter and the entry point. **/
 const skip = 2;
-const [commandName, ...argsList] = process.argv.slice(skip);
 
 /**
  * Reports a failure to the user and marks the process as failed.
@@ -30,40 +31,16 @@ const [commandName, ...argsList] = process.argv.slice(skip);
  * of the commands is still in it. The status a user observes is the same one in both, because the run
  * is already over by the time this is called; what changes is whether the transcript survives it.
  *
- * @param out - The logger or engine the failure is reported to.
+ * @param out - The engine the failure is reported to.
  * @param error - The failure, either an error or a message.
  * @returns void
  */
-function fail(out: Engine | Logger, error: any): void {
+function fail(out: Engine, error: any): void {
     out.error(`&C1${error?.message || error}`);
     process.exitCode = 1;
 }
 
-// The command is resolved before the flags are parsed because the flags are declared per command: the
-// global ones every command carries and the ones the invoked command owns. A command the map does not
-// carry leaves nothing to parse and is answered by the console interface, help included, in every mode.
 const cli = new DepflowCLI();
-const command = commandName ? cli.getCommand(commandName) : undefined;
 
-if (command) {
-    let parsed: Flags.Result<DepflowCLI.Options> | undefined;
-    try { parsed = new Flags(cli.declarationOf(commandName)).parse(argsList) as Flags.Result<DepflowCLI.Options>; }
-    catch (error: any) { fail(cli.out, error); }
-
-    // A failed parse leaves nothing to dispatch: the invocation was never understood, so there is no
-    // argument to hand the command. The process still ends here, with the status `fail` marked.
-    if (parsed !== undefined) {
-        const { args, flags } = parsed;
-        cli.configPath = flags.flow;
-
-        try {
-            const exec = command.exec as DepflowCLI.Exec;
-            await exec.call(cli, commandName as string, args, flags);
-        } catch (error: any) {
-            fail(cli.out, error);
-        }
-    }
-} else {
-    cli.out.error(`Unknown command: ${commandName}`);
-    cli.getCommand('help')?.exec.call(cli, 'help', []);
-}
+try { await cli.invoke(process.argv.slice(skip)); }
+catch (error: any) { fail(cli.out, error); }

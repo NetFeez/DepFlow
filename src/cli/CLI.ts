@@ -8,7 +8,8 @@
 import { Logger, ConsoleUI } from '@netfeez/vterm';
 
 import type { Engine, ConsoleTransport } from '@netfeez/vterm';
-import type Flags from './Flags.js';
+
+import Flags from './Flags.js';
 
 /** The visible column the description of a flag or an argument starts at, in `help`. **/
 const HELP_COLUMN = 26;
@@ -79,15 +80,10 @@ export class CLI {
      * @returns A promise of the command being over.
      */
     protected async dataHandler(data: Buffer): Promise<void> {
-        const [cmd, ...args] = data.toString('utf-8').trim().split(' ');
+        const [ cmd, ...args ] = data.toString('utf-8').trim().split(' ');
         this.out.log(`&C(80,0,80)command received: &C3${cmd}`, args);
-        try {
-            const command = this.commandMap[cmd];
-            if (command) await command.exec.bind(this)(cmd, args);
-            else this.out.error(`&C1Unknown command: &C3${cmd}`);
-        } catch(error) {
-            this.out.error(`&C1Error executing command: &C3${cmd}`, error);
-        }
+        try { await this.invoke([ cmd, ...args ]); }
+        catch (error) { this.out.error(`&C1Error executing command: &C3${cmd}`, error); }
         if (cmd !== 'exit-debug') this.console.write(this.prompt);
     }
 
@@ -104,14 +100,67 @@ export class CLI {
      * @param command - The name of the command, when the line named one.
      * @returns The declaration the flags of that command line are parsed against.
      *
-     * @remarks A named command that the map does not carry gets the global flags alone: the line is still
-     * parsed, so a token that is a flag of no command is reported as an unknown flag rather than as an
-     * unknown command.
+     * @remarks A name the map does not carry gets the global flags alone, which is what a caller that
+     * reads the declaration of a command before it exists needs; {@link CLI.parse} answers such a name
+     * before it ever gets here.
      */
     public declarationOf(command?: string): Flags.Declaration {
         const own = command === undefined ? undefined : this.commandMap[command]?.flags;
         return own ? { ...this.globals, ...own } : this.globals;
     }
+
+    /**
+     * Splits an invocation into the command it names, its positional arguments and the values of the flags
+     * that command accepts.
+     * @param tokens - The tokens of the invocation, the command name first.
+     * @returns The command with what it was invoked with, or `undefined` when the map carries no command
+     *          of that name.
+     * @throws { Error } When a token is a flag the named command does not accept.
+     *
+     * @remarks The command is read before the rest is parsed because the flags are declared per command:
+     * the global ones every command carries plus the ones the named command owns, so the declaration the
+     * arguments and the flags are read against is only known once the command is. A name the map does not
+     * carry leaves nothing to parse and is not an invocation: {@link CLI.invoke} answers it, help included.
+     */
+    public parse(tokens: readonly string[]): CLI.Invocation | undefined {
+        const [ name, ...args ] = tokens;
+        const command = name === undefined ? undefined : this.commandMap[name];
+        if (!command) return undefined;
+        return { command, ...new Flags(this.declarationOf(name)).parse(args) };
+    }
+
+    /**
+     * Reads an invocation and runs the command it names, the console interface owning the reading of the
+     * command, of its positional arguments and of the values of the flags it accepts.
+     * @param tokens - The tokens of the invocation, the command name first.
+     * @returns A promise resolving when the command is over.
+     * @throws { Error } When a token is a flag the named command does not accept.
+     *
+     * @remarks A name the map does not carry is answered here, help included, rather than by the command
+     * it names, because there is no command to hand the line to.
+     */
+    public async invoke(tokens: readonly string[]): Promise<void> {
+        const invocation = this.parse(tokens);
+
+        if (!invocation) {
+            this.out.error(`&C1Unknown command: &C3${tokens[0]}`);
+            this.commandMap['help']?.exec.call(this, 'help', [], {});
+            return;
+        }
+
+        this.adopt(invocation.flags);
+        await invocation.command.exec.call(this, invocation.command.name, invocation.args, invocation.flags);
+    }
+
+    /**
+     * Takes in the flags a parsed invocation carries, before the command that named them runs.
+     * @param flags - The values the invocation parsed.
+     *
+     * @remarks A subclass overrides this to react to the line before the command runs: `DepflowCLI` reads
+     * the configuration file the line asked for here, so the reading of the line and the state it sets
+     * stay apart.
+     */
+    protected adopt(flags: CLI.Values): void { }
 
     /**
      * Puts a command in the map.
@@ -254,7 +303,19 @@ export class CLI {
 
 export namespace CLI {
     export type dataHandler = (data: Buffer) => void;
-    export type commandExec = (this: CLI, command: string, args: string[]) => Promise<void> | void;
+
+    /**
+     * The values of the flags of a parsed command line.
+     *
+     * @remarks Which command owns which flag is not known at this type: the map dispatches by a name read
+     * at runtime, so it can only promise the flags of some declaration, not the ones of a named one. A
+     * command that needs its own flags read back with their declared type reaches them through
+     * {@link CLI.declarationOf} and `Flags`, where the declaration is known.
+     */
+    export type Values = Flags.Values<Flags.Declaration>;
+
+    /** What a command does when it is invoked, with its positional arguments and the flags it accepts. **/
+    export type commandExec = (this: CLI, command: string, args: string[], flags: Values) => Promise<void> | void;
 
     /** A positional argument a command accepts. **/
     export interface Argument {
@@ -285,6 +346,16 @@ export namespace CLI {
     export interface Command extends CommandInfo {
         name: string;
         exec: commandExec;
+    }
+
+    /** A command line read apart: the command it named, with the arguments and the flags it was given. **/
+    export interface Invocation {
+        /** The command the line named. **/
+        command: Command;
+        /** The positional arguments of the line, in order. **/
+        args: string[];
+        /** The values of the flags of the command the line named. **/
+        flags: Values;
     }
 
     /** The commands of the interface, keyed by the name each one is invoked with. **/

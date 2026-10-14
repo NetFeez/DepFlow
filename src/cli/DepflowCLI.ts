@@ -138,28 +138,20 @@ const builderOwn = {
 /** The flags the `add` command owns, beside the global ones. **/
 const addOwn = { npm: EDITING.npm, tag: EDITING.tag } as const satisfies Flags.Declaration;
 
-/** The flags accepted by `resolver`: the global ones plus the ones it owns. **/
-const resolverFlags = new Flags({ ...options.declaration, ...resolverOwn });
-
-/** The flags accepted by `builder`: the global ones plus the ones it owns. **/
-const builderFlags = new Flags({ ...options.declaration, ...builderOwn });
-
-/** The flags accepted by `add`: the global ones plus the ones it owns. **/
-const addFlags = new Flags({ ...options.declaration, ...addOwn });
-
 export class DepflowCLI extends CLI {
     /** Path of the configuration file the commands operate on, as the command line gave it. **/
     public configPath: string;
 
-    public constructor(configPath: string = 'depFlow.yml') { super(options.declaration, {
-        name: 'C-UI',
-        title: '&C1DepFlow &C5CLI &C6by NetFeez',
-        prompt: '&C5[DepFlow] << &C6&S'
-    });
+    public constructor(configPath: string = 'depFlow.yml') {
+        super(options.declaration, {
+            name: 'C-UI',
+            title: '&C1DepFlow &C5CLI &C6by NetFeez',
+            prompt: '&C5[DepFlow] << &C6&S'
+        });
 
         this.configPath = configPath;
 
-        this.addCommand('add', (command, args, flags: typeof addFlags.infer = addFlags.defaults) => Actions.add(this.context, args, flags), {
+        this.addCommand('add', (command, args, flags) => Actions.add(this.context, args, flags), {
             usage: 'dep add <repo_url> [name] [--tag <ref>] | dep add --npm <name>[@<version>]',
             description: 'Add a dependency to the configuration file.',
             args: {
@@ -168,56 +160,56 @@ export class DepflowCLI extends CLI {
             },
             flags: addOwn
         });
-        this.addCommand('remove', (command, args, flags = options.defaults) => Actions.remove(this.context, args, flags), {
+        this.addCommand('remove', (command, args, flags) => Actions.remove(this.context, args, flags), {
             usage: 'dep remove <name> | <repo_url>',
             description: 'Remove a dependency from the configuration file and uninstall its files.',
             args: {
                 identifier: { description: 'Name or repository URL of the dependency to remove.' }
             }
         });
-        this.addCommand('install', (command, args, flags = options.defaults) => Actions.install(this.context, args, flags), {
+        this.addCommand('install', (command, args, flags) => Actions.install(this.context, args, flags), {
             usage: 'dep install [name1 name2 ...]',
             description: 'Install dependencies. If names are provided, only those dependencies will be installed.',
             args: {
                 names: { description: 'Names of the dependencies to install; every dependency when none is given.', required: false, variadic: true }
             }
         });
-        this.addCommand('run', (command, args, flags = options.defaults) => Actions.run(this.context, args, flags), {
+        this.addCommand('run', (command, args, flags) => Actions.run(this.context, args, flags), {
             usage: 'dep run <script>',
             description: 'Run a custom action defined in the configuration file.',
             args: {
                 script: { description: 'Name of the action declared in the configuration file.' }
             }
         });
-        this.addCommand('list', (command, args, flags = options.defaults) => Actions.list(this.context, args, flags), { usage: 'dep list', description: 'List all dependencies in the configuration file.' });
-        this.addCommand('resolver', (command, args, flags: typeof resolverFlags.infer = resolverFlags.defaults) => Actions.resolver(this.context, args, flags), {
+        this.addCommand('list', (command, args, flags) => Actions.list(this.context, args, flags), { usage: 'dep list', description: 'List all dependencies in the configuration file.' });
+        this.addCommand('resolver', (command, args, flags) => Actions.resolver(this.context, args, flags), {
             usage: 'dep resolver add <alias> <local> [--type <t>] [--cdn-url <url>] | remove <alias> | list | clear [--dep <name>]',
             description: 'Edits the resolver aliases of the project or of a named dependency.',
             flags: resolverOwn
         });
-        this.addCommand('builder', (command, args, flags: typeof builderFlags.infer = builderFlags.defaults) => Actions.builder(this.context, args, flags), {
+        this.addCommand('builder', (command, args, flags) => Actions.builder(this.context, args, flags), {
             usage: 'dep builder add <run|extract|transform> ... | remove <index> | move <from> <to> | list | clear [--dep <name> | --action <name>]',
             description: 'Edits the build pipeline of a dependency or of a named action.',
             flags: builderOwn
         });
-        this.addCommand('action', (command, args, flags = options.defaults) => Actions.action(this.context, args, flags), {
+        this.addCommand('action', (command, args, flags) => Actions.action(this.context, args, flags), {
             usage: 'dep action create <name> | remove <name> | list',
             description: 'Manages the named build actions of the configuration.'
         });
-        this.addCommand('config', (command, args, flags = options.defaults) => Actions.config(this.context, args, flags), {
+        this.addCommand('config', (command, args, flags) => Actions.config(this.context, args, flags), {
             usage: 'dep config get [key] | set <key> <value> | unset <key>',
             description: 'Reads and edits the top-level settings of the configuration (outDir, tsconfig, importmap).'
         });
-        this.addCommand('rewrite-paths', (command, args, flags = options.defaults) => Actions.rewritePaths(this.context, args, flags), { usage: 'dep rewrite-paths [--watch] [--cdn]', description: 'Rewrite the paths of the built files of outDir according to the resolver entries of the configuration.' });
-        this.addCommand('sync', (command, args, flags = options.defaults) => Actions.sync(this.context, args, flags), { usage: 'dep sync', description: 'Write the resolver entries into the paths of the declared tsconfig and into the declared importmap.'  });
-        this.addCommand('json-to-yaml', (command, args, flags = options.defaults) => Actions.convert(this.context, command, args, flags), {
+        this.addCommand('rewrite-paths', (command, args, flags) => Actions.rewritePaths(this.context, args, flags), { usage: 'dep rewrite-paths [--watch] [--cdn]', description: 'Rewrite the paths of the built files of outDir according to the resolver entries of the configuration.' });
+        this.addCommand('sync', (command, args, flags) => Actions.sync(this.context, args, flags), { usage: 'dep sync', description: 'Write the resolver entries into the paths of the declared tsconfig and into the declared importmap.'  });
+        this.addCommand('json-to-yaml', (command, args, flags) => Actions.convert(this.context, command, args, flags), {
             usage: 'dep json-to-yaml [output.yaml]',
             description: 'Convert the depflow config file from JSON to YAML.',
             args: {
                 output: { description: 'Path of the YAML file to write; derived from the config file name when it is omitted.', required: false }
             }
         });
-        this.addCommand('yaml-to-json', (command, args, flags = options.defaults) => Actions.convert(this.context, command, args, flags), {
+        this.addCommand('yaml-to-json', (command, args, flags) => Actions.convert(this.context, command, args, flags), {
             usage: 'dep yaml-to-json [output.json]',
             description: 'Convert the depflow config file from YAML to JSON.',
             args: {
@@ -225,6 +217,12 @@ export class DepflowCLI extends CLI {
             }
         });
     }
+
+    /**
+     * Reads the configuration file the invocation asked for, before its command runs.
+     * @param flags - The values the invocation parsed.
+     **/
+    protected adopt(flags: DepflowCLI.Options): void { this.configPath = flags.flow; }
 
     /** Absolute path of the directory holding the configuration file, the project root. **/
     public get projectRoot(): string { return Path.dirname(Path.resolve(process.cwd(), this.configPath)); }
@@ -241,10 +239,10 @@ export class DepflowCLI extends CLI {
         };
     }
 }
-export namespace DepflowCLI {
-    export type Exec = (this: DepflowCLI, command: string, args: string[], flags: Options) => Promise<void> | void;
 
-    /** The values of the flags accepted by the CLI. **/
+export namespace DepflowCLI {
+    /** The values of the global flags, the ones every command carries. **/
     export type Options = typeof options.infer;
 }
+
 export default DepflowCLI;
