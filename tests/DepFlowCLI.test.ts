@@ -9,6 +9,7 @@ import { File, Path } from '@netfeez/common-node';
 import DepFlowCLI, { options } from '../src/cli/DepflowCLI.js';
 import Actions from '../src/cli/Actions.js';
 import Config from '../src/config/Config.js';
+import schema from '../src/schema/schema.js';
 import { body, captureOutput, createGitFixture, createTemp, lockFile, plain, removeTemp, runCli, strip, unlockFile } from './utils.js';
 
 const suite = new TestSuite('cli flow');
@@ -268,6 +269,27 @@ suite.add('install brings the dependency to the revision of its tag', async (con
     } finally { await removeTemp(dir); }
 });
 
+suite.add('install and sync refresh the editor json schema', async (context) => {
+    const dir = await createTemp();
+    try {
+        const origin = await createGitFixture(dir, 'v1');
+        const file = Path.join(dir, 'depflow.json');
+        await File.write(file, JSON.stringify({ dependencies: [ { name: 'alpha', repo: origin, tag: 'v1' } ] }));
+
+        const cli = new DepFlowCLI(file);
+        const schemaPath = Path.join(dir, '.depflow', 'schema.json');
+
+        await Actions.install(cli.context, []);
+        context.expect(await File.exists(schemaPath)).ok();
+        context.expect(await File.read(schemaPath, 'utf-8')).equals(JSON.stringify(schema.Config.jsonSchema));
+
+        await File.remove(schemaPath);
+        await Actions.sync(cli.context, []);
+        context.expect(await File.exists(schemaPath)).ok();
+        context.done();
+    } finally { await removeTemp(dir); }
+});
+
 suite.add('reports no success when the acquisition of a dependency fails', async (context) => {
     const dir = await createTemp();
     try {
@@ -283,6 +305,7 @@ suite.add('reports no success when the acquisition of a dependency fails', async
         const text = strip(captured.text);
         context.expect(text.includes('Installed')).equals(false);
         context.expect(text.includes('Synchronizing')).equals(false);
+        context.expect(await File.exists(Path.join(dir, '.depflow', 'schema.json'))).ok();
         context.done();
     } finally { await removeTemp(dir); }
 });

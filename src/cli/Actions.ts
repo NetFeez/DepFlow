@@ -15,6 +15,7 @@ import GitDependency from '../dependency/GitDependency.js';
 import NpmDependency from '../dependency/NpmDependency.js';
 import PathResolver from '../resolve/PathResolver.js';
 import Config from '../config/Config.js';
+import JsonSchema from '../config/JsonSchema.js';
 import schema from '../schema/schema.js';
 import TSConfig from '../config/TSConfig.js';
 import ImportMap from '../config/ImportMap.js';
@@ -227,6 +228,10 @@ export namespace Actions {
      * @param args - The names of the dependencies to install, every one of them when empty.
      * @param options - The mode options of the run, which also settle the mode of the synchronization.
      * @returns A promise resolving when every target is installed and the aliases are synced.
+     *
+     * @remarks The editor JSON Schema is refreshed before anything is installed, so an editor can validate
+     * the configuration and its `$schema` even when the installation itself fails. The refresh is repeated by
+     * the synchronization the action ends with, which is harmless because the schema is a pure function of it.
      */
     export async function install(context: Context, args: string[], options: Options = {}): Promise<void> {
         const policy = Actions.policy(options);
@@ -239,6 +244,8 @@ export namespace Actions {
             const config = await Config.load(context.configPath);
             const gitDependencies = config.data.dependencies;
             const npmDependencies = config.data.npmDependencies;
+
+            await JsonSchema.write(context.projectRoot);
 
             if (gitDependencies.length + npmDependencies.length === 0) throw new Error(args.length > 0 ? 'Specified dependencies not found.' : 'No dependencies to install.');
 
@@ -383,6 +390,9 @@ export namespace Actions {
      * @param caller - The policy of the run to report through, when the synchronization belongs to another
      *                 action. The policy is built from the options when it is omitted.
      * @returns A promise resolving when both files are updated, or skipped when they are not configured.
+     *
+     * @remarks The editor JSON Schema is refreshed alongside the synchronization, so a build that ends in
+     * `sync` leaves the `$schema` target of the configuration up to date for the editor.
      */
     export async function sync(context: Context, args: string[], options: Options = {}, caller?: OutputPolicy): Promise<void> {
         const policy = caller ?? Actions.policy(options);
@@ -398,6 +408,8 @@ export namespace Actions {
 
             const config = await Config.load(context.configPath);
             const resolver = new PathResolver(config.data, context.projectRoot, { logger: out });
+
+            await JsonSchema.write(context.projectRoot);
 
             const tsconfigFile = config.data.tsconfig;
             const importMapFile = config.data.importmap;

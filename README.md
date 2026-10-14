@@ -84,9 +84,10 @@ are not supported and are reported as an error when the file is loaded. Write li
 indented blocks; the empty `{}` and `[]` the generated file uses are fine. Use JSON if a
 flow-style document is a hard requirement, or let `dep yaml-to-json` produce one.
 
-Whenever the config is saved, DepFlow also refreshes the editor JSON Schema at `.depflow/schema.json`
-and points `$schema` at it, which gives validation and autocompletion in editors that understand JSON
-Schema.
+Whenever the config is saved, and whenever `dep install` or `dep sync` runs, DepFlow also refreshes the
+editor JSON Schema at `.depflow/schema.json` and points `$schema` at it, which gives validation and
+autocompletion in editors that understand JSON Schema. Refreshing it before an installation is what
+lets an editor validate the configuration even when the installation itself fails.
 
 ### Generated configuration
 
@@ -119,7 +120,7 @@ npmDependencies: []
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
-| `$schema` | string | `.depflow/schema.json` | Path to the JSON Schema used by editors. Refreshed on every save. |
+| `$schema` | string | `.depflow/schema.json` | Path to the JSON Schema used by editors. Refreshed on every save, and on `install` and `sync`. |
 | `outDir` | string | `dist` | Output root scanned by `rewrite-paths` and its watcher. Relative or absolute. |
 | `tsconfig` | string \| null | `null` | Path to a `tsconfig.json` whose `compilerOptions.paths` `sync` updates. When `null`, synchronization of the tsconfig is skipped. |
 | `importmap` | string \| null | `null` | Path to an `importmap.json` that `sync` writes. When `null`, synchronization of the import map is skipped. |
