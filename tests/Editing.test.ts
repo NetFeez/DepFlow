@@ -256,7 +256,7 @@ suite.add('add checks out the git dependency at the requested tag', async (conte
         await File.write(file, JSON.stringify({ dependencies: [] }));
         const cli = new DepFlowCLI(file);
 
-        await Actions.add(cli.context, [ 'acme/ui' ], { tag: 'v2' });
+        await Actions.add(cli.context, [ 'https://github.com/acme/ui.git' ], { tag: 'v2' });
 
         const loaded = await Config.load(file);
         context.expect(loaded.data.dependencies[0].tag).equals('v2');

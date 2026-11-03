@@ -152,10 +152,10 @@ export class DepflowCLI extends CLI {
         this.configPath = configPath;
 
         this.addCommand('add', (command, args, flags) => Actions.add(this.context, args, flags), {
-            usage: 'dep add <repo_url> [name] [--tag <ref>] | dep add --npm <name>[@<version>]',
+            usage: 'dep add <repo> [name] [--tag <ref>] | dep add --npm <name>[@<version>]',
             description: 'Add a dependency to the configuration file.',
             args: {
-                repo_url: { description: 'URL of the git repository to add.' },
+                repo: { description: 'Repository to add: a URL ending in .git, an ssh address, or a local path written as file://..., ./... or /... .' },
                 name: { description: 'Name to register the dependency under; derived from the repository URL when it is omitted.', required: false }
             },
             flags: addOwn

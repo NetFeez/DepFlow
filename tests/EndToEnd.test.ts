@@ -61,6 +61,23 @@ suite.add('install materializes the dependency under .depflow at its declared ta
     } finally { await removeTemp(dir); }
 });
 
+suite.add('install materializes a dependency from a relative local repository', async (context) => {
+    const dir = await createTemp('depflow end to end ');
+    try {
+        const root = project(dir);
+        await File.ensureDir(root);
+        await createGitFixture(root, 'v1');
+        await config(root, './origin.git');
+
+        const { code } = await runCli([ 'install', '-f', CONFIG ], root);
+
+        const checkout = Path.join(root, '.depflow', 'omega');
+        context.expect(code).equals(0);
+        context.expect(await File.read(Path.join(checkout, 'version.txt'), 'utf-8')).equals('v1');
+        context.done();
+    } finally { await removeTemp(dir); }
+});
+
 suite.add('rewrite-paths resolves the aliases of the built files and of the dependency', async (context) => {
     const dir = await createTemp('depflow end to end ');
     try {

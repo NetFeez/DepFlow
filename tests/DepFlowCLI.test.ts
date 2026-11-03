@@ -178,17 +178,36 @@ suite.add('add rejects a repository that is not clonable', async (context) => {
     } finally { await removeTemp(dir); }
 });
 
-suite.add('add canonicalizes every github form and derives its name', async (context) => {
+suite.add('add canonicalizes every github URL form and derives its name', async (context) => {
     const dir = await createTemp();
     try {
         const file = Path.join(dir, 'depflow.json');
         await File.write(file, JSON.stringify({ dependencies: [] }));
         const cli = new DepFlowCLI(file);
-        await Actions.add(cli.context, [ 'netfeez/omega' ]);
+        await Actions.add(cli.context, [ 'https://github.com/netfeez/omega' ]);
 
         const loaded = await Config.load(file);
         context.expect(loaded.data.dependencies[0].name).equals('netfeez/omega');
         context.expect(loaded.data.dependencies[0].repo).equals('https://github.com/netfeez/omega.git');
+        context.done();
+    } finally { await removeTemp(dir); }
+});
+
+suite.add('add rejects the github shorthand', async (context) => {
+    const dir = await createTemp();
+    try {
+        const file = Path.join(dir, 'depflow.json');
+        await File.write(file, JSON.stringify({ dependencies: [] }));
+        const cli = new DepFlowCLI(file);
+        try {
+            await Actions.add(cli.context, [ 'netfeez/omega' ]);
+            context.fail('expected the add to reject the github shorthand');
+        } catch (error) {
+            context.expect((error as Error).message).includes('clonable git repository');
+        }
+
+        const loaded = await Config.load(file);
+        context.expect(loaded.data.dependencies.length).equals(0);
         context.done();
     } finally { await removeTemp(dir); }
 });
@@ -222,6 +241,22 @@ suite.add('add persists a local repository under the given name', async (context
         context.expect(loaded.data.dependencies.length).equals(1);
         context.expect(loaded.data.dependencies[0].name).equals('omega');
         context.expect(loaded.data.dependencies[0].repo).equals(origin);
+        context.done();
+    } finally { await removeTemp(dir); }
+});
+
+suite.add('add persists a relative local repository as it was given', async (context) => {
+    const dir = await createTemp();
+    try {
+        await createGitFixture(dir, 'v1');
+        const file = Path.join(dir, 'depflow.json');
+        await File.write(file, JSON.stringify({ dependencies: [] }));
+        const cli = new DepFlowCLI(file);
+        await Actions.add(cli.context, [ './origin.git', 'omega' ]);
+
+        const loaded = await Config.load(file);
+        context.expect(loaded.data.dependencies[0].name).equals('omega');
+        context.expect(loaded.data.dependencies[0].repo).equals('./origin.git');
         context.done();
     } finally { await removeTemp(dir); }
 });

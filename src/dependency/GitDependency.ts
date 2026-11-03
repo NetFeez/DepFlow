@@ -29,8 +29,7 @@ export class GitDependency extends Dependency implements GitDependency.Data {
             builder: dependency.builder,
             resolver: dependency.resolver || {}
         }, logger, policy);
-        DepUtils.repo(dependency.repo);
-        this.repo = dependency.repo;
+        this.repo = DepUtils.normalize(dependency.repo);
         this.tag = dependency.tag;
     }
     /** The folder of the checkout, the identity of the dependency inside the flow folder. **/
@@ -54,7 +53,7 @@ export class GitDependency extends Dependency implements GitDependency.Data {
                 this.logger?.log(`&C2Pull completed successfully.`);
             } else {
                 this.logger?.log(`&C5Cloning repository from &C6${this.repo}&C5...`);
-                await Git.clone(this.repo, this.folder, { tag: this.tag, logger: this.logger ?? undefined, policy: this.policy });
+                await Git.clone(this.repo, this.folder, { tag: this.tag, logger: this.logger ?? undefined, policy: this.policy, cwd: this.projectRoot });
                 this.logger?.log(`&C2Clone completed successfully.`);
             }
             await this.build();

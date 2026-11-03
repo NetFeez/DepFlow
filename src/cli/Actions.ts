@@ -138,7 +138,7 @@ export namespace Actions {
     /**
      * Adds a git dependency to the configuration, creating the file from the defaults when it does not exist.
      * @param context - The project the action operates on.
-     * @param args - The repository URL and, optionally, the name to register the dependency under.
+     * @param args - The repository reference and, optionally, the name to register the dependency under.
      * @param options - The mode options of the run.
      * @returns A promise resolving when the dependency is persisted.
      */

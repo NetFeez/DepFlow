@@ -148,7 +148,7 @@ dependencies:
 | Key | Type | Default | Meaning |
 |---|---|---|---|
 | `name` | string | — (required) | Identity of the dependency. See [Dependency identity](#dependency-identity). |
-| `repo` | string | — (required) | Any value `git clone` accepts, always ending in `.git`. |
+| `repo` | string | — (required) | A remote repository `git clone` accepts, always ending in `.git`, or a local path written as `file://…`, `./…` or `/…`. The `user/repo` shorthand is not accepted. |
 | `tag` | string | `main` | Tag, branch or commit the checkout is left on. |
 | `builder` | array | `[]` | Build pipeline applied after cloning. |
 | `resolver` | object | `{}` | Aliases contributed by this dependency. |
@@ -183,18 +183,20 @@ The `name` of a dependency is an identity, not an arbitrary path:
 - An NPM name is a package name, optionally scoped (`@scope/name`).
 
 The name of a git dependency can be derived from its repository only when that repository is a GitHub
-one, where it becomes `<user>/<repo>` (for example `NetFeez/vizui`). For any other repository the
-name has to be given explicitly to `dep add`.
+URL, where it becomes `<user>/<repo>` (for example `NetFeez/vizui`). For any other repository, and for
+a local path, the name has to be given explicitly to `dep add`.
 
-`dep add` accepts a GitHub repository written in any of its usual forms, canonicalizes it to the
-repository git clones from, always ending in `.git`, and derives the name from it when no name is
-given:
+`repo` accepts a GitHub repository as an HTTP(S) URL or as an SCP like ssh address, with or without
+the `.git` suffix; it is canonicalized to the repository git clones from, always ending in `.git`. A
+local repository is written as `file://…`, `./…` or `/…`, and its `.git` suffix is optional. The
+`user/repo` shorthand is not accepted, so a bare `user/repo` can never be confused with a local path:
 
 ```bash
-dep add netfeez/vizui                          # https://github.com/netfeez/vizui.git, name netfeez/vizui
 dep add https://github.com/netfeez/vizui        # https://github.com/netfeez/vizui.git, name netfeez/vizui
 dep add https://github.com/netfeez/vizui.git    # https://github.com/netfeez/vizui.git, name netfeez/vizui
 dep add git@github.com:/netfeez/vizui           # git@github.com:netfeez/vizui.git, name netfeez/vizui
+dep add ./.references/vizui vizui               # local path, name given explicitly
+dep add file:///srv/repos/vizui.git vizui       # file URL, name given explicitly
 ```
 
 ### Build pipelines
@@ -390,7 +392,7 @@ it. `dep --flow x install` is read as the command `--flow`, so flags belong afte
 
 | Command | Usage | Description |
 |---|---|---|
-| `add` | `dep add <repo> [name] [--tag <ref>]` or `dep add --npm <name>[@<version>]` | Add a dependency to the configuration, creating the file from the defaults if it does not exist. A git repository may be given as `user/repo`, as an HTTP(S) URL or as an ssh address, with or without the `.git` suffix; it is canonicalized to the URL git clones from, and its name is derived from it when omitted, which only a GitHub repository allows. `--tag` sets the tag, branch or commit it is checked out at (default `main`). With `--npm` the argument is an npm package `<name>[@<version>]`, defaulting to `latest`, registered under `npmDependencies`. A name already taken is refused. |
+| `add` | `dep add <repo> [name] [--tag <ref>]` or `dep add --npm <name>[@<version>]` | Add a dependency to the configuration, creating the file from the defaults if it does not exist. A git repository may be given as an HTTP(S) URL or as an ssh address, with or without the `.git` suffix, or as a local path written with `file://`, `./` or `/`; a remote is canonicalized to the URL git clones from, and its name is derived from it when omitted, which only a GitHub URL allows. The `user/repo` shorthand is not accepted. `--tag` sets the tag, branch or commit it is checked out at (default `main`). With `--npm` the argument is an npm package `<name>[@<version>]`, defaulting to `latest`, registered under `npmDependencies`. A name already taken is refused. |
 | `remove` | `dep remove <name\|repo_url>` | Remove a dependency by name (git or npm) or by git repository URL, and uninstall its local files. An identifier no dependency declares is an error. |
 | `install` | `dep install [name...]` | Fetch, build and extract every dependency, or only the named ones. A checkout already in place is updated to its `tag` instead of cloned again. Runs `sync` afterwards. |
 | `run` | `dep run <action>` | Run a named action from `actions`, in the project root. |

@@ -36,7 +36,7 @@ export const GitDependency = new Schema({
         repo: {
             type: 'string',
             required: true,
-            description: 'Git repository URL to clone the dependency from.'
+            description: 'Git repository to clone the dependency from: a URL ending in .git, an ssh address, or a local path written as file://..., ./... or /... . The user/repo shorthand is not accepted.'
         },
         tag: {
             type: 'string',

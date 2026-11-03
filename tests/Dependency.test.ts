@@ -162,6 +162,34 @@ suite.add('clones a repository and checks out its tag', async (context) => {
     } finally { await removeTemp(dir); }
 });
 
+suite.add('resolves a relative local repository against the project root', async (context) => {
+    const dir = await createTemp();
+    try {
+        await createGitFixture(dir, 'v1');
+        const flow = Path.join(dir, '.depflow');
+        const dependency = new GitDependency(flow, dir, git('omega', { repo: './origin.git', tag: 'v1' }));
+
+        await dependency.install();
+
+        context.expect(await File.read(Path.join(dependency.folder, 'version.txt'), 'utf-8')).equals('v1');
+        context.done();
+    } finally { await removeTemp(dir); }
+});
+
+suite.add('clones a repository addressed by a file URL', async (context) => {
+    const dir = await createTemp();
+    try {
+        const origin = await createGitFixture(dir, 'v1');
+        const flow = Path.join(dir, '.depflow');
+        const dependency = new GitDependency(flow, dir, git('omega', { repo: Path.toUrl(origin), tag: 'v1' }));
+
+        await dependency.install();
+
+        context.expect(await File.read(Path.join(dependency.folder, 'version.txt'), 'utf-8')).equals('v1');
+        context.done();
+    } finally { await removeTemp(dir); }
+});
+
 suite.add('clones a repository under a user/repo identity', async (context) => {
     const dir = await createTemp();
     try {
@@ -325,7 +353,7 @@ suite.add('fails the install when the repository cannot be cloned', async (conte
 suite.add('rejects a repository that is not clonable', async (context) => {
     const dir = await createTemp();
     try {
-        for (const repo of [ '', '   ', 'not a url', 'netfeez/', '/omega', 'a/b/c' ])
+        for (const repo of [ '', '   ', 'not a url', 'netfeez/', 'a/b', 'a/b.git', 'a/b/c', './', 'file://' ])
             context.expect(rejectsRepo(repo)).equals(true);
         context.done();
     } finally { await removeTemp(dir); }
@@ -341,7 +369,12 @@ suite.add('accepts every transport git clones from', async (context) => {
             'git://example.com/omega.git',
             'file:///srv/repos/omega.git',
             'git@github.com:netfeez/omega.git',
-            '/srv/repos/omega.git'
+            'file:///srv/repos/omega',
+            'file:///srv/repos/omega.git',
+            '/srv/repos/omega',
+            '/srv/repos/omega.git',
+            './.references/omega',
+            './.references/omega.git'
         ]) DepUtils.repo(repo);
         context.done();
     } finally { await removeTemp(dir); }
@@ -350,7 +383,7 @@ suite.add('accepts every transport git clones from', async (context) => {
 suite.add('canonicalizes every form a github repository is given in', async (context) => {
     const dir = await createTemp();
     try {
-        for (const repo of [ 'netfeez/omega', 'netfeez/omega.git', 'https://github.com/netfeez/omega', 'https://github.com/netfeez/omega.git' ]) {
+        for (const repo of [ 'https://github.com/netfeez/omega', 'https://github.com/netfeez/omega.git' ]) {
             const parsed = DepUtils.parse(repo);
             context.expect(parsed.repo).equals('https://github.com/netfeez/omega.git');
             context.expect(parsed.name).equals('netfeez/omega');
@@ -360,11 +393,21 @@ suite.add('canonicalizes every form a github repository is given in', async (con
             context.expect(parsed.repo).equals('git@github.com:netfeez/omega.git');
             context.expect(parsed.name).equals('netfeez/omega');
         }
-        for (const repo of [ 'https://gitlab.com/netfeez/omega.git', '/srv/repos/omega.git' ]) {
+        for (const repo of [ 'https://gitlab.com/netfeez/omega.git', '/srv/repos/omega.git', '/srv/repos/omega', './.references/omega', 'file:///srv/repos/omega' ]) {
             const parsed = DepUtils.parse(repo);
             context.expect<string>(parsed.repo).equals(repo);
             context.expect(parsed.name).equals(null);
         }
+        context.done();
+    } finally { await removeTemp(dir); }
+});
+
+suite.add('normalizes a local repository path to forward slashes', async (context) => {
+    const dir = await createTemp();
+    try {
+        context.expect(DepUtils.normalize('./.references//omega/')).equals('./.references/omega');
+        context.expect(DepUtils.normalize('/srv//repos/omega/')).equals('/srv/repos/omega');
+        context.expect(DepUtils.normalize('file:///srv//repos/omega/')).equals('file:///srv/repos/omega');
         context.done();
     } finally { await removeTemp(dir); }
 });
@@ -375,9 +418,8 @@ suite.add('derives the name of a github repository only', async (context) => {
         context.expect(DepUtils.getRepoName('https://github.com/netfeez/omega.git')).equals('netfeez/omega');
         context.expect(DepUtils.getRepoName('https://github.com/netfeez/omega')).equals('netfeez/omega');
         context.expect(DepUtils.getRepoName('git@github.com:netfeez/omega.git')).equals('netfeez/omega');
-        context.expect(DepUtils.getRepoName('netfeez/omega')).equals('netfeez/omega');
 
-        for (const repo of [ 'https://gitlab.com/netfeez/omega.git', '/srv/repos/omega.git' ]) {
+        for (const repo of [ 'https://gitlab.com/netfeez/omega.git', '/srv/repos/omega.git', './.references/omega', 'file:///srv/repos/omega' ]) {
             try {
                 DepUtils.getRepoName(repo);
                 context.fail(`expected "${repo}" to have no derivable name`);
