@@ -197,11 +197,11 @@ export class DepflowCLI extends CLI {
             description: 'Manages the named build actions of the configuration.'
         });
         this.addCommand('config', (command, args, flags) => Actions.config(this.context, args, flags), {
-            usage: 'dep config get [key] | set <key> <value> | unset <key>',
-            description: 'Reads and edits the top-level settings of the configuration (outDir, tsconfig, importmap).'
+            usage: 'dep config get [key] | set <key> <value[,value...]> | unset <key>',
+            description: 'Reads and edits the top-level settings of the configuration (outDir, tsconfig, importmap). Path settings accept one value or a comma-separated list.'
         });
         this.addCommand('rewrite-paths', (command, args, flags) => Actions.rewritePaths(this.context, args, flags), { usage: 'dep rewrite-paths [--watch] [--cdn]', description: 'Rewrite the paths of the built files of outDir according to the resolver entries of the configuration.' });
-        this.addCommand('sync', (command, args, flags) => Actions.sync(this.context, args, flags), { usage: 'dep sync', description: 'Write the resolver entries into the paths of the declared tsconfig and into the declared importmap.'  });
+        this.addCommand('sync', (command, args, flags) => Actions.sync(this.context, args, flags), { usage: 'dep sync', description: 'Write the resolver entries into the declared tsconfig and import map targets, including the targets declared by each dependency.' });
         this.addCommand('json-to-yaml', (command, args, flags) => Actions.convert(this.context, command, args, flags), {
             usage: 'dep json-to-yaml [output.yaml]',
             description: 'Convert the depflow config file from JSON to YAML.',

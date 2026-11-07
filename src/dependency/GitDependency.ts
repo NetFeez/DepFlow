@@ -24,9 +24,12 @@ export class GitDependency extends Dependency implements GitDependency.Data {
         dependency: GitDependency.Data,
         logger: Logger | null = null,
         policy: OutputPolicy | null = null
-    ) { super(flowFolder, projectRoot, {
+    ) {
+        super(flowFolder, projectRoot, {
             name: dependency.name,
             builder: dependency.builder,
+            tsconfig: dependency.tsconfig,
+            importmap: dependency.importmap,
             resolver: dependency.resolver || {}
         }, logger, policy);
         this.repo = DepUtils.normalize(dependency.repo);

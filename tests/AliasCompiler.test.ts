@@ -37,6 +37,31 @@ suite.add('collects dependency resolvers and the base resolver', (context) => {
     context.done();
 });
 
+suite.add('attaches the synchronization targets declared by a dependency', (context) => {
+    const config = schema.Config.process({
+        dependencies: [{
+            name: 'git.dep',
+            repo: 'https://github.com/netfeez/git.git',
+            tsconfig: 'tsconfig.pwa.json',
+            importmap: [ 'importmap.pwa.json', 'importmap.vizui.json' ],
+            resolver: { '@git': 'src/git' }
+        }],
+        resolver: { '@base': 'src/base' }
+    });
+    const aliases = new AliasCompiler(projectRoot).compile(config);
+    const git = aliases.find(alias => alias.alias === '@git')!;
+    const base = aliases.find(alias => alias.alias === '@base')!;
+
+    context.expect(JSON.stringify(git.syncTargets.tsconfig)).equals(JSON.stringify([ Path.join(projectRoot, 'tsconfig.pwa.json') ]));
+    context.expect(JSON.stringify(git.syncTargets.importmap)).equals(JSON.stringify([
+        Path.join(projectRoot, 'importmap.pwa.json'),
+        Path.join(projectRoot, 'importmap.vizui.json')
+    ]));
+    context.expect(base.syncTargets.tsconfig).equals(null);
+    context.expect(base.syncTargets.importmap).equals(null);
+    context.done();
+});
+
 suite.add('flags wildcard aliases and strips their suffix', (context) => {
     const aliases = compile({ 'components/*': 'packages/components' });
     context.expect(aliases.length).equals(1);

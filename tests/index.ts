@@ -13,6 +13,7 @@ import aliasCompilerSuite from './AliasCompiler.test.js';
 import pathResolverSuite from './PathResolver.test.js';
 import pathRewriterSuite from './PathRewriter.test.js';
 import configSuite from './Config.test.js';
+import syncSuite from './Sync.test.js';
 import dependencySuite from './Dependency.test.js';
 import flagsSuite from './Flags.test.js';
 import outputPolicySuite from './OutputPolicy.test.js';
@@ -28,6 +29,7 @@ const suites: TestSuite[] = [
     pathResolverSuite,
     pathRewriterSuite,
     configSuite,
+    syncSuite,
     dependencySuite,
     flagsSuite,
     outputPolicySuite,

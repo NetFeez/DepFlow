@@ -462,7 +462,7 @@ suite.add('the builder, git and npm present the same task the same way', async (
 
         const flow = Path.join(dir, '.depflow');
         await File.ensureDir(Path.join(flow, 'node_modules', 'omega'));
-        const npm = new NpmDependency(flow, dir, { name: 'omega', version: '1.0.0', builder: pipeline({ run: FAILS }), resolver: {} }, null, policy(dir, 'npm', { decorate: false }));
+        const npm = new NpmDependency(flow, dir, { name: 'omega', version: '1.0.0', builder: pipeline({ run: FAILS }), tsconfig: null, importmap: null, resolver: {} }, null, policy(dir, 'npm', { decorate: false }));
         const byNpm = await said(() => npm.build());
 
         // The same `Task` is presented by the same policy in the three paths, so what it said about the

@@ -220,6 +220,19 @@ suite.add('config set, get and unset edit the top-level settings', async (contex
         context.expect(loaded.data.outDir).equals('build');
         context.expect(loaded.data.tsconfig).equals('tsconfig.json');
 
+        await Actions.config(cli.context, [ 'set', 'tsconfig', 'tsconfig.client.json, tsconfig.pwa.json' ]);
+        loaded = await Config.load(file);
+        context.expect(JSON.stringify(loaded.data.tsconfig)).equals(JSON.stringify([ 'tsconfig.client.json', 'tsconfig.pwa.json' ]));
+
+        await Actions.config(cli.context, [ 'set', 'importmap', 'public/importmap.json' ]);
+        loaded = await Config.load(file);
+        context.expect(loaded.data.importmap).equals('public/importmap.json');
+
+        await rejects(context, () => Actions.config(cli.context, [ 'set', 'tsconfig', 'tsconfig.client.json,,tsconfig.pwa.json' ]), 'empty entries');
+        await rejects(context, () => Actions.config(cli.context, [ 'set', 'tsconfig', '   ' ]), 'cannot be empty');
+        loaded = await Config.load(file);
+        context.expect(JSON.stringify(loaded.data.tsconfig)).equals(JSON.stringify([ 'tsconfig.client.json', 'tsconfig.pwa.json' ]));
+
         await Actions.config(cli.context, [ 'unset', 'tsconfig' ]);
         loaded = await Config.load(file);
         context.expect(loaded.data.tsconfig).equals(null);

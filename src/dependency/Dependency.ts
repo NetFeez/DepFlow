@@ -26,6 +26,8 @@ export abstract class Dependency {
 
     public readonly name: string;
     public readonly builder: schema.Builder;
+    public readonly tsconfig: string | string[] | null;
+    public readonly importmap: string | string[] | null;
     public readonly resolver: AliasCompiler.Resolver;
 
     /**
@@ -56,6 +58,8 @@ export abstract class Dependency {
     ) {
         this.name = info.name;
         this.builder = info.builder || [];
+        this.tsconfig = info.tsconfig ?? null;
+        this.importmap = info.importmap ?? null;
         this.resolver = info.resolver || {};
         this.logger = logger || null;
         this.policy = policy || null;
@@ -101,6 +105,8 @@ export namespace Dependency {
     export interface Info {
         name: string;
         builder?: schema.Builder;
+        tsconfig?: string | string[] | null;
+        importmap?: string | string[] | null;
         resolver?: AliasCompiler.Resolver;
     }
 }

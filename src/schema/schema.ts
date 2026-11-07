@@ -6,6 +6,7 @@
 import _TSConfig from './TSConfig.js';
 import _ImportMap from './ImportMap.js';
 import _Config from './Config/Config.js';
+import _PathSelection from './Config/PathSelection.js';
 import _Resolver, { Target as _Target } from './Config/Resolver.js';
 import _Transform, { GlobalTransform as _GlobalTransform } from './Config/Transform.js';
 import _Extractor from './Config/Extractor.js';
@@ -20,6 +21,7 @@ import _Dependency from './Config/Dependency.js';
 export { TSConfig } from './TSConfig.js';
 export { ImportMap } from './ImportMap.js';
 export { Config } from './Config/Config.js';
+export { PathSelection } from './Config/PathSelection.js';
 export { Resolver, Target } from './Config/Resolver.js';
 export { Transform, GlobalTransform } from './Config/Transform.js';
 export { Extractor } from './Config/Extractor.js';
@@ -30,6 +32,7 @@ export namespace schema {
     export import TSConfig = _TSConfig;
     export import ImportMap = _ImportMap;
     export import Config = _Config;
+    export import PathSelection = _PathSelection;
     export import Resolver = _Resolver;
     export import Target = _Target;
     export import Transform = _Transform;

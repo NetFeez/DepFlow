@@ -26,6 +26,8 @@ export class NpmDependency extends Dependency implements NpmDependency.Data {
         super(flowFolder, projectRoot, {
             name: dependency.name,
             builder: dependency.builder,
+            tsconfig: dependency.tsconfig,
+            importmap: dependency.importmap,
             resolver: dependency.resolver || {}
         }, logger, policy);
         this.version = dependency.version;

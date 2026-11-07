@@ -5,6 +5,7 @@
  */
 import Schema from '@netfeez/schema';
 import Builder from './Builder.js';
+import PathSelection from './PathSelection.js';
 import Resolver from './Resolver.js';
 import Defaults from '../Defaults.js';
 
@@ -48,6 +49,14 @@ export const GitDependency = new Schema({
             get default() { return Defaults.array(); },
             description: 'Build pipeline applied after cloning the repository.'
         },
+        tsconfig: {
+            ...PathSelection.definition,
+            description: 'Path or list of paths to tsconfig files that receive only this dependency resolver aliases. When null, the top-level tsconfig targets are used.'
+        },
+        importmap: {
+            ...PathSelection.definition,
+            description: 'Path or list of paths to import map files that receive only this dependency resolver aliases. When null, the top-level import map targets are used.'
+        },
         resolver: {
             ...Resolver.definition,
             get default() { return Defaults.record(); },
@@ -76,6 +85,14 @@ export const NpmDependency = new Schema({
             ...Builder.definition,
             get default() { return Defaults.array(); },
             description: 'Build pipeline applied after installing the package.'
+        },
+        tsconfig: {
+            ...PathSelection.definition,
+            description: 'Path or list of paths to tsconfig files that receive only this dependency resolver aliases. When null, the top-level tsconfig targets are used.'
+        },
+        importmap: {
+            ...PathSelection.definition,
+            description: 'Path or list of paths to import map files that receive only this dependency resolver aliases. When null, the top-level import map targets are used.'
         },
         resolver: {
             ...Resolver.definition,

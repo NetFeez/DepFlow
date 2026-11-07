@@ -35,7 +35,7 @@ export class ImportMap extends Settings<typeof schema.ImportMap> {
      * @param mode - The resolution mode ('local' or 'cdn').
      */
     public updateImports(aliases: AliasCompiler.CompiledAlias[], mode: 'local' | 'cdn'): void {
-        if (!this.data.imports) this.data.imports = {};
+        this.data.imports = { ...this.data.imports };
 
         const projectRoot = Path.dirname(this.path!);
 

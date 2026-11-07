@@ -28,19 +28,34 @@ export class AliasCompiler {
         const baseResolvers = config.resolver || {};
         for (const dep of allDeps) {
             if (typeof dep !== 'object' || !dep.resolver) continue;
-            result.push(...this.resolve(dep.resolver));
+            result.push(...this.resolve(dep.resolver, this.syncTargets(dep.tsconfig, dep.importmap)));
         }
         result.push(...this.resolve(baseResolvers));
         return result;
     }
+
+    /**
+     * Resolves the synchronization targets declared by a dependency.
+     * @param tsconfig - The tsconfig path selection of the dependency.
+     * @param importmap - The import map path selection of the dependency.
+     * @returns The absolute synchronization targets, with `null` meaning the top-level targets are inherited.
+     */
+    protected syncTargets(tsconfig: string | string[] | null, importmap: string | string[] | null): AliasCompiler.SyncTargets {
+        return {
+            tsconfig: AliasCompiler.resolvePaths(this.projectRoot, tsconfig),
+            importmap: AliasCompiler.resolvePaths(this.projectRoot, importmap)
+        };
+    }
+
     /**
      * Resolves an array of resolver entries into compiled alias objects, handling both string and object target formats.
      * It determines if each alias is a wildcard and resolves local paths to absolute paths based on the project root.
      * The method also extracts type and CDN targets if provided in the resolver entry.
      * @param resolver - An array of resolver entries to process into compiled aliases.
+     * @param syncTargets - The files that receive the aliases, or `null` to inherit the top-level targets.
      * @returns An array of compiled alias objects derived from the resolver entries.
      */
-    protected resolve(resolver: AliasCompiler.Resolver): AliasCompiler.CompiledAlias[] {
+    protected resolve(resolver: AliasCompiler.Resolver, syncTargets: AliasCompiler.SyncTargets = { tsconfig: null, importmap: null }): AliasCompiler.CompiledAlias[] {
         const result: AliasCompiler.CompiledAlias[] = [];
         for (const [crudeAlias, target] of Object.entries(resolver)) {
             const isWildcard = AliasCompiler.isWildcard(crudeAlias);
@@ -61,9 +76,22 @@ export class AliasCompiler {
                     cdnTarget = AliasCompiler.removeWildcardSuffix(target.cdn);
                 }
             }
-            result.push({ alias, isWildcard, targets: { local: localTarget, type: typeTarget, cdn: cdnTarget } });
+            result.push({ alias, isWildcard, targets: { local: localTarget, type: typeTarget, cdn: cdnTarget }, syncTargets });
         }
         return result;
+    }
+
+    /**
+     * Resolves a path selection into absolute, unique paths.
+     * @param projectRoot - The root the relative paths are resolved against.
+     * @param value - A single path, a list of paths, or `null`.
+     * @returns The absolute paths, or `null` when the selection is `null`.
+     */
+    private static resolvePaths(projectRoot: string, value: string | string[] | null): string[] | null {
+        if (value === null) return null;
+
+        const paths = Array.isArray(value) ? value : [value];
+        return [ ...new Set(paths.map(entry => path.resolve(projectRoot, entry))) ];
     }
 
     /**
@@ -87,10 +115,15 @@ export class AliasCompiler {
 export namespace AliasCompiler {
     export type Resolver = schema.Resolver;
     export type Target = Exclude<schema.Target, string>;
+    export interface SyncTargets {
+        tsconfig: string[] | null;
+        importmap: string[] | null;
+    }
     export interface CompiledAlias {
         alias: string;
         targets: Target;
         isWildcard: boolean;
+        syncTargets: SyncTargets;
     }
 }
 export default AliasCompiler;

@@ -46,6 +46,51 @@ suite.add('round-trips a YAML config', async (context) => {
     } finally { await removeTemp(dir); }
 });
 
+suite.add('round-trips path selections as strings and arrays', async (context) => {
+    const dir = await createTemp();
+    try {
+        const file = Path.join(dir, 'depflow.yaml');
+        const config = await Config.load(file);
+        config.data.tsconfig = [ 'tsconfig.client.json', 'tsconfig.pwa.json' ];
+        config.data.importmap = 'public/importmap.json';
+        config.data.dependencies.push({
+            name: 'alpha',
+            repo: 'https://github.com/netfeez/alpha.git',
+            tag: 'v1',
+            builder: [],
+            tsconfig: 'tsconfig.pwa.json',
+            importmap: [ 'public/importmap.pwa.json', 'public/importmap.vizui.json' ],
+            resolver: { '@alpha': 'lib' }
+        });
+        await config.save();
+
+        const loaded = await Config.load(file);
+        context.expect(JSON.stringify(loaded.data.tsconfig)).equals(JSON.stringify([ 'tsconfig.client.json', 'tsconfig.pwa.json' ]));
+        context.expect(loaded.data.importmap).equals('public/importmap.json');
+        context.expect(loaded.data.dependencies[0].tsconfig).equals('tsconfig.pwa.json');
+        context.expect(JSON.stringify(loaded.data.dependencies[0].importmap)).equals(JSON.stringify([
+            'public/importmap.pwa.json',
+            'public/importmap.vizui.json'
+        ]));
+        context.done();
+    } finally { await removeTemp(dir); }
+});
+
+suite.add('rejects a path selection carrying a non-string entry', async (context) => {
+    const dir = await createTemp();
+    try {
+        const file = Path.join(dir, 'depflow.json');
+        await File.write(file, JSON.stringify({ tsconfig: [ 'tsconfig.json', 1 ] }));
+        try {
+            await Config.load(file);
+            context.fail('expected the load to reject a non-string path selection entry');
+        } catch (error) {
+            context.expect((error as Error).message.includes('tsconfig')).ok();
+        }
+        context.done();
+    } finally { await removeTemp(dir); }
+});
+
 suite.add('writes the collections of a yaml config in block style', async (context) => {
     const dir = await createTemp();
     try {
@@ -56,6 +101,8 @@ suite.add('writes the collections of a yaml config in block style', async (conte
             repo: 'https://github.com/netfeez/alpha.git',
             tag: 'v1',
             builder: [],
+            tsconfig: null,
+            importmap: null,
             resolver: { '@alpha': 'lib' }
         });
         config.data.resolver = { '@utils': 'src/utils' };
@@ -127,7 +174,7 @@ suite.add('gives every config its own copy of the default dependencies', async (
     const first = schema.Config.process({});
     const second = schema.Config.process({});
 
-    first.dependencies.push({ name: 'alpha', repo: 'https://github.com/netfeez/alpha.git', tag: 'main', builder: [], resolver: {} });
+    first.dependencies.push({ name: 'alpha', repo: 'https://github.com/netfeez/alpha.git', tag: 'main', builder: [], tsconfig: null, importmap: null, resolver: {} });
     first.resolver.alpha = { local: 'dist' };
     context.expect(first.dependencies.length).equals(1);
     context.expect(first.npmDependencies.length).equals(0);

@@ -5,6 +5,7 @@
  */
 import Schema from '@netfeez/schema';
 import Builder from './Builder.js';
+import PathSelection from './PathSelection.js';
 import Resolver from './Resolver.js';
 import Defaults from '../Defaults.js';
 import { GitDependency, NpmDependency } from './Dependency.js';
@@ -23,16 +24,12 @@ export const Config = new Schema({
             description: 'Output directory for built files. Can be relative or absolute. Defaults to "dist".'
         },
         tsconfig: {
-            type: 'string',
-            nullable: true,
-            default: null,
-            description: 'Path to the tsconfig.json file. Can be relative or absolute. Defaults to "tsconfig.json".'
+            ...PathSelection.definition,
+            description: 'Path or list of paths to tsconfig.json files. Can be relative or absolute. When null, tsconfig synchronization is skipped unless a dependency declares its own.'
         },
         importmap: {
-            type: 'string',
-            nullable: true,
-            default: null,
-            description: 'Path to the importmap.json file. Can be relative or absolute. Defaults to "importmap.json".'
+            ...PathSelection.definition,
+            description: 'Path or list of paths to importmap.json files. Can be relative or absolute. When null, import map synchronization is skipped unless a dependency declares its own.'
         },
         actions: {
             type: 'object',

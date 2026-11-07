@@ -21,6 +21,7 @@ import TSConfig from '../config/TSConfig.js';
 import ImportMap from '../config/ImportMap.js';
 import Builder from '../builder/Builder.js';
 
+import type AliasCompiler from '../resolve/AliasCompiler.js';
 import type { Target } from '../schema/Config/Resolver.js';
 import type { BuilderEntry } from '../schema/Config/Builder.js';
 
@@ -411,24 +412,62 @@ export namespace Actions {
 
             await JsonSchema.write(context.projectRoot);
 
-            const tsconfigFile = config.data.tsconfig;
-            const importMapFile = config.data.importmap;
-            const tsconfigPath = Path.join(context.projectRoot, tsconfigFile || 'tsconfig.json');
-            const importMapPath = Path.join(context.projectRoot, importMapFile || 'importmap.json');
+            const topLevelTSConfigs = pathSelection(context.projectRoot, config.data.tsconfig);
+            const topLevelImportMaps = pathSelection(context.projectRoot, config.data.importmap);
 
-            if (tsconfigFile) {
+            const tsconfigTargets = new Set(topLevelTSConfigs);
+            const importMapTargets = new Set(topLevelImportMaps);
+            for (const alias of resolver.aliases) {
+                for (const target of alias.syncTargets.tsconfig ?? []) tsconfigTargets.add(target);
+                for (const target of alias.syncTargets.importmap ?? []) importMapTargets.add(target);
+            }
+
+            if (tsconfigTargets.size === 0) out.warn(`No tsconfig file specified in configuration or dependencies. Skipping tsconfig synchronization.`);
+            else for (const tsconfigPath of tsconfigTargets) {
+                const aliases = selectAliases(resolver.aliases, topLevelTSConfigs, tsconfigPath, 'tsconfig');
                 const tsconfig = await TSConfig.load(tsconfigPath, { logger: out });
-                tsconfig.updatePaths(resolver.aliases);
+                tsconfig.updatePaths(aliases);
                 await tsconfig.save();
-            } else out.warn(`No tsconfig file specified in configuration. Skipping tsconfig synchronization.`);
-            if (importMapFile) {
+            }
+
+            if (importMapTargets.size === 0) out.warn(`No import map file specified in configuration or dependencies. Skipping import map synchronization.`);
+            else for (const importMapPath of importMapTargets) {
+                const aliases = selectAliases(resolver.aliases, topLevelImportMaps, importMapPath, 'importmap');
                 const importmap = await ImportMap.load(importMapPath, { logger: out });
-                importmap.updateImports(resolver.aliases, mode);
+                importmap.updateImports(aliases, mode);
                 await importmap.save();
-            } else out.warn(`No import map file specified in configuration. Skipping import map synchronization.`);
+            }
 
             out.info(`&C2Successfully synced all configurations.`);
         } finally { if (boxed) out.end(); }
+    }
+
+    /**
+     * Normalizes a path selection into absolute, unique paths.
+     * @param projectRoot - The root the relative paths are resolved against.
+     * @param selection - A single path, a list of paths, or `null`.
+     * @returns The absolute paths, empty when the selection is `null`.
+     */
+    function pathSelection(projectRoot: string, selection: string | string[] | null): string[] {
+        if (selection === null) return [];
+
+        const paths = Array.isArray(selection) ? selection : [selection];
+        return [ ...new Set(paths.map(entry => Path.resolve(projectRoot, entry))) ];
+    }
+
+    /**
+     * Selects the aliases whose synchronization targets include the given file.
+     * @param aliases - The compiled aliases of the project.
+     * @param topLevel - The top-level targets, inherited by aliases without their own.
+     * @param file - The file being synchronized.
+     * @param kind - The kind of synchronization target to inspect.
+     * @returns The aliases that belong to the file.
+     */
+    function selectAliases(aliases: AliasCompiler.CompiledAlias[], topLevel: string[], file: string, kind: keyof AliasCompiler.SyncTargets): AliasCompiler.CompiledAlias[] {
+        return aliases.filter(alias => {
+            const targets = alias.syncTargets[kind];
+            return targets === null ? topLevel.includes(file) : targets.includes(file);
+        });
     }
 
     /**
@@ -678,7 +717,8 @@ export namespace Actions {
                     const keys = key ? [ key ] : [ ...SETTINGS ];
                     for (const name of keys) {
                         if (!isSetting(name)) throw new Error(`Unknown setting "${name}", expected one of: ${SETTINGS.join(', ')}.`);
-                        out.info(`&C6${name} &C7= &C2${loaded.data[name] ?? 'null'}`);
+                        const current = loaded.data[name];
+                        out.info(`&C6${name} &C7= &C2${Array.isArray(current) ? current.join(',') : current ?? 'null'}`);
                     }
                     return;
                 }
@@ -687,8 +727,8 @@ export namespace Actions {
                     if (!isSetting(key)) throw new Error(`Unknown setting "${key}", expected one of: ${SETTINGS.join(', ')}.`);
 
                     if (key === 'outDir') loaded.data.outDir = value;
-                    else if (key === 'tsconfig') loaded.data.tsconfig = value === 'null' ? null : value;
-                    else loaded.data.importmap = value === 'null' ? null : value;
+                    else if (key === 'tsconfig') loaded.data.tsconfig = parsePathSelection(value);
+                    else loaded.data.importmap = parsePathSelection(value);
 
                     await loaded.save();
                     out.info(`&C2Set &C6${key} &C2to &C6${value}&C2.`);
@@ -711,6 +751,26 @@ export namespace Actions {
 
     /** The top-level settings the config command reads and edits. **/
     const SETTINGS = [ 'outDir', 'tsconfig', 'importmap' ] as const;
+
+    /**
+     * Parses a command-line path selection: `null`, one path, or a comma-separated list of paths.
+     * @param value - The raw value given to the command.
+     * @returns The path selection, trimmed.
+     * @throws { Error } When the value is empty or a list contains an empty entry.
+     *
+     * @remarks A comma separates entries, so a path containing a comma cannot be expressed through this
+     * command; such a path is written directly into the configuration file instead.
+     */
+    function parsePathSelection(value: string): string | string[] | null {
+        const trimmed = value.trim();
+        if (trimmed === 'null') return null;
+        if (trimmed.length === 0) throw new Error('Path selections cannot be empty.');
+        if (!trimmed.includes(',')) return trimmed;
+
+        const paths = trimmed.split(',').map(part => part.trim());
+        if (paths.some(path => path.length === 0)) throw new Error('Path selections cannot contain empty entries.');
+        return paths.length === 1 ? paths[0] : paths;
+    }
 
     /**
      * Whether a name is one of the top-level settings the config command edits.

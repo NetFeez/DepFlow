@@ -102,9 +102,9 @@ A freshly generated `depflow.yml` looks like this:
 $schema: .depflow/schema.json
 # Output directory for built files. Can be relative or absolute. Defaults to "dist".
 outDir: dist
-# Path to the tsconfig.json file. Can be relative or absolute. Defaults to "tsconfig.json".
+# Path or list of paths to tsconfig.json files. Can be relative or absolute.
 tsconfig: null
-# Path to the importmap.json file. Can be relative or absolute. Defaults to "importmap.json".
+# Path or list of paths to importmap.json files. Can be relative or absolute.
 importmap: null
 # Named build actions. Each action runs a pipeline of run, extract and transform steps.
 actions: {}
@@ -122,8 +122,8 @@ npmDependencies: []
 |---|---|---|---|
 | `$schema` | string | `.depflow/schema.json` | Path to the JSON Schema used by editors. Refreshed on every save, and on `install` and `sync`. |
 | `outDir` | string | `dist` | Output root scanned by `rewrite-paths` and its watcher. Relative or absolute. |
-| `tsconfig` | string \| null | `null` | Path to a `tsconfig.json` whose `compilerOptions.paths` `sync` updates. When `null`, synchronization of the tsconfig is skipped. |
-| `importmap` | string \| null | `null` | Path to an `importmap.json` that `sync` writes. When `null`, synchronization of the import map is skipped. |
+| `tsconfig` | string \| string[] \| null | `null` | Path or list of paths to `tsconfig.json` files whose `compilerOptions.paths` `sync` updates. When `null`, the global tsconfig targets are skipped, unless a dependency declares its own. |
+| `importmap` | string \| string[] \| null | `null` | Path or list of paths to `importmap.json` files that `sync` writes. When `null`, the global import map targets are skipped, unless a dependency declares its own. |
 | `actions` | object | `{}` | Named build pipelines runnable with `dep run <action>`. |
 | `resolver` | object | `{}` | Aliases shared by the whole project, merged with each dependency's own `resolver`. |
 | `dependencies` | array | `[]` | Git dependencies. |
@@ -151,6 +151,8 @@ dependencies:
 | `repo` | string | — (required) | A remote repository `git clone` accepts, always ending in `.git`, or a local path written as `file://…`, `./…` or `/…`. The `user/repo` shorthand is not accepted. |
 | `tag` | string | `main` | Tag, branch or commit the checkout is left on. |
 | `builder` | array | `[]` | Build pipeline applied after cloning. |
+| `tsconfig` | string \| string[] \| null | `null` | Tsconfig target or targets that receive only this dependency's aliases. When `null`, the global targets are inherited. |
+| `importmap` | string \| string[] \| null | `null` | Import map target or targets that receive only this dependency's aliases. When `null`, the global targets are inherited. |
 | `resolver` | object | `{}` | Aliases contributed by this dependency. |
 
 An **NPM dependency** is installed into `.depflow/node_modules/<name>` and built the same way:
@@ -168,6 +170,8 @@ npmDependencies:
 | `name` | string | — (required) | Package name, optionally scoped. |
 | `version` | string | — (required) | Version or semver range to install. |
 | `builder` | array | `[]` | Build pipeline applied after installing. |
+| `tsconfig` | string \| string[] \| null | `null` | Tsconfig target or targets that receive only this dependency's aliases. When `null`, the global targets are inherited. |
+| `importmap` | string \| string[] \| null | `null` | Import map target or targets that receive only this dependency's aliases. When `null`, the global targets are inherited. |
 | `resolver` | object | `{}` | Aliases contributed by this dependency. |
 
 Git dependencies are installed before NPM dependencies.
@@ -301,6 +305,45 @@ resolver:
 An alias ending in `/` or `/*` is a **wildcard** alias: `@app/*` also covers `@app/Button`. Dependency
 resolvers are compiled before the project resolver, so a project entry with the same alias wins.
 
+By default, every dependency resolver writes to the top-level `tsconfig` and `importmap` targets. A
+dependency can declare its own targets, which replace the top-level ones **only for its aliases**:
+
+```yaml
+tsconfig:
+  - tsconfig.client.json
+  - tsconfig.pwa.json
+
+importmap: public/importmap.json
+
+resolver:
+  "@app/*": src/app
+
+dependencies:
+  - name: NetFeez/vizui
+    repo: https://github.com/NetFeez/vizui.git
+    tsconfig: tsconfig.pwa.json
+    importmap:
+      - public/importmap.pwa.json
+      - public/importmap.vizui.json
+    resolver:
+      "@vizui/*": public/lib/vizui
+```
+
+The global `@app/*` alias still goes to both top-level tsconfigs and `public/importmap.json`, while
+`@vizui/*` goes only to `tsconfig.pwa.json` and the two import maps the dependency declares. Declaring
+only one of the two keys leaves the other kind inheriting the top-level targets. An empty list disables
+that kind for the dependency, while `null` inherits the top-level targets. A dependency-specific target
+is synchronized even when it is not listed at the top level. Every target is resolved against the
+project root, whatever file declares it.
+
+Resolution priority and synchronization ownership are separate. Dependency resolvers are compiled
+before the project resolver, so when both declare the same alias and both are written to the same file,
+the project entry is the one that remains. A dependency alias is still written to the targets that
+dependency declares, even when the project declares the same alias for another target.
+
+Lists are written in block style: the YAML dialect DepFlow reads rejects non-empty flow collections
+such as `[ "a", "b" ]`.
+
 ### Named actions
 
 `actions` maps a name to a list of `run`, `extract` and `transform` steps, run in the project root by
@@ -324,7 +367,9 @@ actions:
 ```yaml
 $schema: .depflow/schema.json
 outDir: dist
-tsconfig: tsconfig.json
+tsconfig:
+  - tsconfig.client.json
+  - tsconfig.pwa.json
 importmap: public/importmap.json
 
 resolver:
@@ -398,11 +443,11 @@ it. `dep --flow x install` is read as the command `--flow`, so flags belong afte
 | `run` | `dep run <action>` | Run a named action from `actions`, in the project root. |
 | `list` | `dep list` | List the declared dependencies, marking each one `installed` or `missing`. |
 | `rewrite-paths` | `dep rewrite-paths [--watch] [--cdn]` | Rewrite import specifiers in the built files of `outDir` according to the resolver. A file that cannot be rewritten fails the command. |
-| `sync` | `dep sync [--cdn]` | Write the resolver aliases into the configured `tsconfig` and `importmap`. |
+| `sync` | `dep sync [--cdn]` | Write the resolver aliases into the configured `tsconfig` and `importmap`, including the targets each dependency declares for its own aliases. |
 | `resolver` | `dep resolver add <alias> <local> [--type <t>] [--cdn-url <url>] [--force] \| remove <alias> \| list \| clear` | Edit the resolver aliases. Without `--dep` the project resolver is edited; with it, the named dependency's own resolver. `add` refuses an alias already taken unless `--force` is given. |
 | `builder` | `dep builder add <run\|extract\|transform> ... \| remove <index> \| move <from> <to> \| list \| clear` | Edit the build pipeline of the dependency named by `--dep` or of the action named by `--action`. `add run` takes one or more commands (`--max-time`, `--allow-fails`); `add extract` takes a glob (`--to`, `--map`); `add transform` takes a glob (`--search`, `--replace`, `--flags`). `--index` chooses where the step is inserted. |
 | `action` | `dep action create <name> \| remove <name> \| list` | Create, remove or list the named actions of the configuration. A new action starts empty and is filled through `builder --action`. |
-| `config` | `dep config get [key] \| set <key> <value> \| unset <key>` | Read and edit the top-level settings `outDir`, `tsconfig` and `importmap`. `set` accepts `null` for the nullable ones; `outDir` cannot be unset. |
+| `config` | `dep config get [key] \| set <key> <value[,value...]> \| unset <key>` | Read and edit the top-level settings `outDir`, `tsconfig` and `importmap`. `set` accepts `null` for the nullable ones, one path, or a comma-separated list of paths; empty values and empty list entries are rejected, and a path containing a comma must be written directly into the configuration file. `outDir` cannot be unset. |
 | `json-to-yaml` | `dep json-to-yaml [output.yaml]` | Convert the config to YAML. The output name is derived from the input name when omitted. |
 | `yaml-to-json` | `dep yaml-to-json [output.json]` | Convert the config to JSON. The output name is derived from the input name when omitted. |
 
@@ -504,7 +549,9 @@ as `C<M>`; the commands inside a pipeline with more than one `run` step are qual
 
 ## How `sync` and `rewrite-paths` Work
 
-`sync` compiles the resolver into aliases and writes them to the configured files:
+`sync` compiles the resolver into aliases and writes them to the configured files. A dependency that
+declares its own `tsconfig` or `importmap` writes there instead of the top-level targets; the other
+kind still inherits the top-level ones:
 
 - the **tsconfig** `compilerOptions.paths` receives one entry per alias, always pointing at the local
   target. A wildcard alias becomes `<alias>/*`. When a target declares a `type`, the type path is the
@@ -513,6 +560,8 @@ as `C<M>`; the commands inside a pipeline with more than one `run` step are qual
   `/`. Local targets are written relative to the directory of the importmap file. With `--cdn`, an
   alias that declares a `cdn` target uses it; the others keep their local path. Existing `scopes` are
   preserved.
+- a target declared by a dependency is synchronized even when it is not listed at the top level. Each
+  file is written once, with the aliases that belong to it.
 
 `rewrite-paths` scans `outDir` for files ending in `.js`, `.ts`, `.jsx`, `.tsx`, `.cjs` or `.mjs`
 and rewrites every `from '...'` specifier whose module path matches an alias:
